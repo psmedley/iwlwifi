@@ -1,0 +1,56 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * hw.h - the contract between the chip-independent part of the driver (OS/2 plumbing in os2/, the station in
+ * wlan/) and a chip back end (iwl/ for the Intel iwlwifi family).
+ *
+ * One back end is linked into a driver binary. A back end owns: recognising its PCI functions, the firmware
+ * file format, bring-up, the interrupt, scanning, the firmware objects a join needs, transmit and receive.
+ * The station (wlan/sta.c) owns the 802.11 state machine that mac80211 would run on Linux: the scan table,
+ * authentication and association frames, keys handed over by the supplicant, the EAPOL queue, and the
+ * conversion between Ethernet and 802.11 data frames.
+ *
+ * All functions run at task time under nic_lock() unless marked otherwise.
+ */
+#ifndef HW_H
+#define HW_H
+
+struct net_s;
+
+/* ---- identity ------------------------------------------------------------------------------------- */
+int    hw_pci_match(USHORT ven, USHORT dev, USHORT subven, USHORT subdev); /* INIT: 1 = this back end drives it */
+char  *hw_name(void);                           /* the adapter's name (after a match)                        */
+char  *hw_fw_name(void);                        /* the firmware file the device needs                        */
+int    hw_fw_is_mine(UCHAR FAR *head, USHORT n);   /* the first bytes of a file written to the device: 1 = firmware */
+UCHAR  hw_vendor_oui(USHORT i);                 /* OID_GEN_VENDOR_ID bytes 0..2                              */
+
+/* ---- state ---------------------------------------------------------------------------------------- */
+extern USHORT g_hw_ready;                       /* firmware running, station usable                          */
+extern USHORT g_hw_failed;                      /* bring-up failed; "up" on the device retries               */
+extern USHORT g_hw_state;                       /* bring-up step reached (status text)                       */
+extern UCHAR  g_hw_mac[6];                      /* the adapter's own address (NVM / OTP)                     */
+extern UCHAR  g_hw_nss;                         /* receive spatial streams (HT MCS 0-7 / 0-15)               */
+
+int    hw_up(void);                             /* full bring-up; 0 = ready                                  */
+void   hw_down(void);
+void   hw_service(void);                        /* process completed work: never blocks (task time or hook)  */
+int    hw_wait(USHORT *flag, USHORT ms);        /* service until *flag != 0; 0 = set, -1 = timeout           */
+USHORT hw_irq(void);                            /* INTERRUPT TIME: 1 = ours (device interrupt masked)        */
+void   hw_hook(void);                           /* context hook: service, then unmask the device interrupt   */
+void   hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
+
+/* ---- station operations ---------------------------------------------------------------------------- */
+int    hw_scan(void);                           /* blocking full scan; results through sta_beacon()          */
+int    hw_join_prepare(struct net_s *n);        /* go to the AP's channel, firmware objects for the AP       */
+int    hw_join_complete(void);                  /* associated: AID, rates, HT from the sta state (g_j*)      */
+void   hw_leave(void);                          /* undo hw_join_prepare / hw_join_complete                   */
+int    hw_mgmt_tx(UCHAR FAR *frame, USHORT len);   /* a complete management frame; 0 = queued                */
+int    hw_key_set(UCHAR FAR *key, USHORT klen, USHORT pairwise, UCHAR idx);   /* CCMP key; 0 = installed */
+int    hw_key_clear(USHORT pairwise, UCHAR idx);
+
+/* An 802.11 data frame: hdr = 802.11 header (24 bytes, To-DS), body = LLC/SNAP + payload.
+ * flags: HWTX_PROTECT = encrypt with the pairwise key. Returns 0 queued, -2 busy. */
+#define HWTX_PROTECT    0x0001
+#define HWTX_EAPOL      0x0002
+int    hw_data_tx(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT flags);
+
+#endif

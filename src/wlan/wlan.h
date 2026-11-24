@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/*
+ * wlan.h - the chip-independent station (wlan/sta.c): scan table, join, keys, EAPOL queue, data conversion.
+ * Derived from ath_sta.c of the QCA6174 driver (github.com/psmedley/qca6174).
+ */
+#ifndef WLAN_H
+#define WLAN_H
+
+#define NET_MAX         24
+#define NET_IE_MAX      320
+typedef struct net_s {
+   UCHAR  bssid[6];
+   UCHAR  len;                                  /* SSID length                                               */
+   char   ssid[32];
+   UCHAR  ch;
+   signed char rssi;
+   UCHAR  sec;                                  /* privacy bit                                               */
+   UCHAR  htc;                                  /* HT capabilities element present                           */
+   UCHAR  wmm;                                  /* WMM parameter / information element present              */
+   UCHAR  ht_mcs[2];                            /* the AP's rx MCS bitmap bytes 0, 1                         */
+   UCHAR  basic[2];                             /* basic-rate bitmap: bit i = rate i of g_rate_tab           */
+   USHORT ielen;                                /* bytes in ie[] (12 fixed beacon bytes + elements)          */
+   UCHAR  ie[NET_IE_MAX];
+   ULONG  seen;                                 /* dd_ms() of the last beacon / probe response               */
+   ULONG  tsf_lo, tsf_hi;                       /* the beacon timestamp                                      */
+   ULONG  rx_time;                              /* hardware time stamp of that beacon (chip units)           */
+} net_t;
+extern net_t  g_net[NET_MAX];
+extern USHORT g_nnet;
+
+/* Join state (read by the back end in hw_join_prepare / hw_join_complete) */
+extern USHORT g_joined, g_authorized, g_ptk_on, g_open_net;
+extern UCHAR  g_jbssid[6], g_jssid[32], g_jslen, g_jch;
+extern USHORT g_jfail;                          /* reason of the last failed join (docs/TESTING.md)          */
+extern UCHAR  g_jreq[200], g_jres[160];
+extern USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
+extern UCHAR  g_jht;                            /* HT negotiated with this AP                                */
+extern UCHAR  g_jht_mcs[2];                     /* the AP's HT rx MCS bytes from its association response     */
+extern UCHAR  g_jrates[12];                     /* the AP's legacy rates (association response), 802.11 units */
+extern USHORT g_jnrates;
+extern UCHAR  g_forcech;                        /* PROTOCOL.INI CHANNEL: join only this primary channel      */
+extern UCHAR  g_maxw;                           /* PROTOCOL.INI MAXWIDTH (0 20, 1 40, 2 80 MHz)              */
+extern USHORT g_link_lost;
+extern net_t *g_jnet;                           /* the scan entry being joined / joined                       */
+
+/* called by the back end */
+void   sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxflags, ULONG rxtime);
+#define RXF_DECRYPTED   0x0001                  /* the hardware decrypted it: 8-byte CCMP header + MIC present */
+void   sta_beacon(UCHAR FAR *frame, USHORT len, USHORT chan, short rssi, ULONG rxtime);
+void   sta_scan_clear(void);
+void   sta_age(void);
+void   sta_lost(void);                          /* missed beacons, firmware kick-out                          */
+
+/* called by the GenMAC OID layer */
+void   sta_set_want(UCHAR FAR *ssid, UCHAR len, USHORT open);
+int    sta_join(UCHAR FAR *want_bssid, USHORT any_bssid);   /* 0 = associated                              */
+void   sta_leave(void);
+void   sta_poll(void);
+short  sta_rssi(void);
+int    sta_key_add(UCHAR FAR *key, USHORT klen, USHORT pairwise, UCHAR idx);
+int    sta_key_remove(USHORT pairwise, UCHAR idx);
+int    sta_tx(UCHAR FAR *eth, USHORT len);      /* NDIS data: 0 = queued, -1 = no link, -2 = busy            */
+int    sta_eapol_tx(UCHAR FAR *eth, USHORT len);
+USHORT sta_eapol_count(void);
+USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
+extern USHORT g_rx_eapol, g_rx_ndis, g_rx_nobuf, g_rx_data, g_rx_drop[8], g_tx_data, g_tx_busy;
+
+#endif

@@ -1,0 +1,10 @@
+[IWLWIFI]
+Type = NDIS
+Title = "Intel Wireless (iwlwifi family) PCIe WLAN (OS/2 native)"
+Version = 0.0
+DriverName = WRND32$
+Xports = NETBEUI, LANDD
+
+[File]
+Name = IWLWIFI.OS2
+Path = IBMCOM\MACS

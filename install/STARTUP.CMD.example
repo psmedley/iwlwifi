@@ -1,0 +1,10 @@
+@echo off
+rem STARTUP.CMD lines for the iwlwifi OS/2 driver (Intel Wireless-AC 8260).
+rem The driver cannot read files during boot, so the firmware file from linux-firmware
+rem (intel/iwlwifi/iwlwifi-8000C-36.ucode, about 2.4 MB) is copied into it once per boot.
+copy /b C:\IBMCOM\MACS\IWLWIFI\iwlwifi-8000C-36.ucode \DEV\WRND32$ > nul
+rem The adapter starts as soon as the file is in (INIT firmware, NVM, calibration, runtime firmware: a few
+rem seconds), so the driver knows its real MAC before the protocol stack binds. Keep this line BEFORE anything
+rem that runs NETBIND / LAN start, and before the Wireless LAN Monitor.
+rem To retry a failed start:      echo up > \DEV\WRND32$
+rem The state at any time:        copy \DEV\WRND32$ con

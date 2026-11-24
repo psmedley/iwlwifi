@@ -1,0 +1,24 @@
+[PROT_MAN]
+
+   DRIVERNAME = PROTMAN$
+
+[IBMLXCFG]
+
+   TCPIP_NIF = TCPIP.NIF
+   IWLWIFI_NIF = IWLWIFI.NIF
+
+[TCPIP_NIF]
+
+   DriverName = TCPIP$
+   Bindings = IWLWIFI_NIF
+
+[IWLWIFI_NIF]
+
+   DriverName = WRND32$
+
+   ; Your adapter's MAC (HWMAC= in the status text; IWLMAC.CMD writes it here). Recommended: TCP/IP copies the
+   ; address at bind time, which can be before the firmware has run and the driver knows the real one.
+   NETADDRESS = "000000000000"
+
+   ; Optional: join only an access point on this primary channel (testing).
+   ; CHANNEL = 6
