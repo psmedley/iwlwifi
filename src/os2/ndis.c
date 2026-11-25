@@ -205,6 +205,10 @@ void ndis_rx_free(USHORT h)
       g_rxp_busy[h] = 0;
 }
 
+static UCHAR g_ind_pending;
+extern USHORT g_in_hook;
+static void indication_complete(void);
+
 static void deliver(USHORT h, USHORT len)
 {
    WORD   rc;
@@ -247,6 +251,18 @@ static void deliver(USHORT h, USHORT len)
       rt_atomic_dec_nz(&g_ind_off);
    if (rc != NDIS_WAIT_FOR_RELEASE)
       g_rxp_busy[h] = 0;
+   g_ind_pending = 1;                              /* IndicationComplete once per batch (ndis_hook_deliver)  */
+   rt_lock_release(&g_ind_owner);
+}
+
+/* End of a batch of indications. */
+static void indication_complete(void)
+{
+   if (!g_ind_pending)
+      return;
+   g_ind_pending = 0;
+   if (rt_lock_try(&g_ind_owner, (USHORT)(rt_cpu_id() + 1)))
+      return;
    (*gProtLDT.pIndicationComplete)(gCCT.moduleID, gProtCCT.moduleDS);
    rt_lock_release(&g_ind_owner);
 }
@@ -267,10 +283,11 @@ void ndis_hook_deliver(void)
       USHORT i = (USHORT)(g_q_tail % RXP_N);
 
       if (g_ind_off != 0)
-         return;                                  /* IndicationOn re-arms the hook                         */
+         break;                                   /* IndicationOn re-arms the hook                         */
       g_q_tail++;
       deliver(g_q_h[i], g_q_len[i]);
    }
+   indication_complete();
 }
 
 void ndis_rx_put(USHORT h, USHORT len)
@@ -282,7 +299,8 @@ void ndis_rx_put(USHORT h, USHORT len)
    g_q_h[g_q_head % RXP_N]   = (UCHAR)h;
    g_q_len[g_q_head % RXP_N] = len;
    rt_atomic_inc(&g_q_head);
-   hook_arm();
+   if (!g_in_hook)
+      hook_arm();
 }
 
 /* ---- NDIS entry points ------------------------------------------------------------------------------ */

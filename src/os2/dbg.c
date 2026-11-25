@@ -265,7 +265,8 @@ static void ph(ULONG v, USHORT digits)
 }
 static void nl(void) { ps("\r\n"); }
 
-extern USHORT g_hook_runs, g_lat_max, g_lat_n;
+extern USHORT g_hook_runs, g_lat_max, g_lat_n, g_busy_max;
+extern ULONG  g_lat_sum, g_busy_tot;
 extern ULONG  g_lat_sum;
 extern ULONG  g_oidlog[], g_oidlog_st[];
 extern UCHAR  g_oidlog_set[];
@@ -320,7 +321,9 @@ static void build_status(void)
    ps(" dup="); ph(g_ba_dup, 4); ps(" timeouts="); ph(g_ba_to, 4); ps(" maxheld="); ph(g_ba_max, 2); nl();
    ps("TXBA(tx aggregation) qosframes="); ph(g_tx_qos, 4); ps(" addba="); ph(g_atx_req, 4); ps(" accepted="); ph(g_atx_ok, 4);
    ps(" refused="); ph(g_atx_refused, 4); ps(" timeouts="); ph(g_atx_timeout, 4); ps(" delba="); ph(g_atx_delba, 4); nl();
-   ps("LAT irq2hook max="); ph(g_lat_max, 4); ps("ms n="); ph(g_lat_n, 4); nl();
+   ps("LAT irq2hook max="); ph(g_lat_max, 4); ps("ms n="); ph(g_lat_n, 4);
+   ps(" avg="); ph(g_lat_n ? u32_div(g_lat_sum, g_lat_n) : 0, 4); ps("ms service busy total="); ph(g_busy_tot, 8);
+   ps("ms worst-second="); ph(g_busy_max, 4); ps("ms hooks="); ph(g_hook_runs, 4); ps(" irqs="); ph(g_irq_count, 4); nl();
    hw_status(ps, ph, nl);                                  /* the back end's own lines                         */
    for (i = 0; i < g_nnet; i++) {
       ps("NET="); ph(g_net[i].ch, 2); ps(" ");

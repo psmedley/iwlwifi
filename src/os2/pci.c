@@ -217,7 +217,8 @@ void mmio_wr8(ULONG off, UCHAR v)
 static ULONG  g_hook;
 static USHORT g_hook_ok;
 USHORT        g_hook_runs, g_hook_armfail, g_lat_max, g_lat_n;
-ULONG         g_lat_sum;
+ULONG         g_lat_sum, g_busy_tot, g_busy_win, g_win_t;
+USHORT        g_busy_max, g_in_hook;     /* service time per second (ms), worst second; set while the hook services */
 static ULONG  g_irq_t;
 
 int hook_init(void)
@@ -239,6 +240,7 @@ void hook_arm(void)
 void __cdecl dd_hook_c(void)
 {
    USHORT d = (USHORT)(dd_ms() - g_irq_t);          /* interrupt -> task-time servicing, in ms              */
+   ULONG  t0, t1;
 
    if (d < 1000) {
       if (d > g_lat_max) g_lat_max = d;
@@ -246,8 +248,20 @@ void __cdecl dd_hook_c(void)
       g_lat_n++;
    }
    g_hook_runs++;
+   t0 = dd_ms();
+   g_in_hook = 1;                                   /* frames queued now are delivered below: no need to re-arm */
    hw_hook();
+   g_in_hook = 0;
    ndis_hook_deliver();
+   t1 = dd_ms();
+   g_busy_tot += t1 - t0;
+   g_busy_win += t1 - t0;
+   if ((long)(t1 - g_win_t) >= 1000L) {
+      if (g_busy_win > g_busy_max && g_busy_win < 1000UL * 2)
+         g_busy_max = (USHORT)g_busy_win;
+      g_busy_win = 0;
+      g_win_t = t1;
+   }
 }
 
 /* Interrupt time. Returns 1 when the interrupt was ours (EOI issued), 0 otherwise (shared line). */

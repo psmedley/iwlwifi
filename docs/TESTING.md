@@ -183,3 +183,10 @@ every full-size frame (1500-byte IP packet = 1522 > 1520) was dropped (`drop[4]`
 `queued=0` afterwards, no command or configuration failures. `TXFAIL`/`hist fail` in this run counted every aggregate
 response (its status field is not a frame result): not a real failure, fixed afterwards. `UNHANDLED` (notification with
 code 0, queue 0x80, 4 bytes `01 00 00 00`) still grows with receive traffic; harmless so far.
+
+**Throughput ceiling (runs 7-9):** download and upload both stop at about 6.6 MB/s on 2.4 GHz HT20 (144 Mbit/s raw), while a
+wired OS/2 machine reaches about 15 MB/s. The `LAT` line now also shows the average interrupt-to-service latency and the
+time spent in the service hook (`busy total=`, `worst-second=` ms per second; near 1000 means the CPU is the limit).
+Compare `hooks=` with `irqs=` and with the received frame count: about one hook per frame means per-frame overhead.
+Changes made for this: no hook re-arm for frames queued while the hook is already running, and one NDIS
+IndicationComplete per batch of received frames instead of one per frame.
