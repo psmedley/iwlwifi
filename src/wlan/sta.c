@@ -24,6 +24,7 @@ USHORT g_jnrates;
 UCHAR  g_forcech, g_maxw;
 USHORT g_link_lost;
 net_t *g_jnet;
+USHORT g_rx_mgmt[16];
 USHORT g_rx_eapol, g_rx_ndis, g_rx_nobuf, g_rx_data, g_rx_drop[8], g_tx_data, g_tx_busy;
 
 static USHORT g_auth_rx, g_auth_status, g_assoc_rx, g_assoc_status, g_assoc_aid, g_assoc_caps, g_assoc_reslen;
@@ -311,6 +312,7 @@ static void sta_mgmt_rx(UCHAR FAR *f, USHORT len)
       return;
    if (!mac_eq(f + 10, (UCHAR FAR *)g_target))          /* sender must be the AP we talk to                  */
       return;
+   g_rx_mgmt[(fc0 >> 4) & 15]++;
    if (fc0 == 0xB0 && len >= 30) {                       /* authentication                                    */
       if (f[26] == 2 && f[27] == 0) {                    /* transaction sequence 2                            */
          g_auth_status = get16(f + 28);

@@ -312,6 +312,9 @@ static void build_status(void)
    ps("NDIS reg="); ph(ndis_state(8), 1); ps(" status="); ph(ndis_state(0), 4); ps(" filter="); ph(ndis_state(1), 4);
    ps(" rxbufs="); ph(ndis_state(6), 2); ps(" txbuf="); ph(ndis_state(7), 1); ps(" tx="); ph(ndis_state(2), 4);
    ps(" txhw="); ph(ndis_state(3), 4); ps(" rx="); ph(ndis_state(4), 4); ps(" nobuf="); ph(ndis_state(5), 4); nl();
+   ps("MGMTRX(from the AP, subtype 0-15; 1 assoc resp, 11 auth, 12 deauth, 10 disassoc, 13 action)=");
+   for (i = 0; i < 16; i++) { ph(g_rx_mgmt[i], 2); ps(i < 15 ? "," : ""); }
+   nl();
    ps("LAT irq2hook max="); ph(g_lat_max, 4); ps("ms n="); ph(g_lat_n, 4); nl();
    hw_status(ps, ph, nl);                                  /* the back end's own lines                         */
    for (i = 0; i < g_nnet; i++) {

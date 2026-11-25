@@ -69,7 +69,9 @@ same networks.
 | 9 | the firmware objects for the join failed (`LASTERR`) |
 | 11 | the post-association commands failed |
 
-Then bind TCP/IP (DHCP) and ping. `DATA rx= ndis= tx=` and `TXOK=`/`TXFAIL=` show the data path; `drop=` counts
+Then bind TCP/IP (DHCP) and ping. `MGMTRX=` counts the management frames the AP sent back (subtype 11 authentication, 1 association response, 12
+deauthentication, 10 disassociation); `TXST` shows the firmware's status for the last frame sent (`0001` ok) and the
+rate it used. `DATA rx= ndis= tx=` and `TXOK=`/`TXFAIL=` show the data path; `drop=` counts
 received frames dropped (0 not from our AP, 1 null data, 2 A-MSDU, 3 protected but not decrypted, 4 too short,
 5 before the keys, 6 not LLC/SNAP).
 
@@ -92,6 +94,14 @@ Everything before that worked: `FWVER=36.c8e8e144.0`, ALIVE twice (`ALIVE=11`), 
 46 firmware packets received. Then `FWERR=1` (the firmware crashed), `CMDTO=1`, `REPLYERR=1`, last packet `0002`
 (REPLY_ERROR). Cause suspected: the temperature-thresholds command was sent with 44 bytes instead of 20 (fixed;
 a REPLY_ERROR answer is now treated as a failed command).
+
+**Run 2** (build 7d8d850): `STATE=0064 READY`, no firmware errors. `CMDS=` shows the whole sequence accepted
+(ADD_STA, PHY_CONTEXT, thresholds `0404`, POWER_TABLE `0077`, MCC `00C8`, SCAN_CFG `010C`, four `001D` queue
+configurations, `00D2`, SCAN_REQ `010D`). The scan found 16 access points (RSSI -41 to -78 dBm): 2.4 GHz channels
+1, 4, 6, 11 and 5 GHz channels 36, 56, 136, 149, hidden SSIDs included; 19 frames received, none with a CRC error.
+`LAT irq2hook max=004E` (78 ms from interrupt to the task-time handler at worst). `JFAIL=08` is a join attempted
+by the Wireless LAN Monitor while the adapter was not ready (before the fix). The Monitor's `GET` requests now get
+answers and the MAC is set (`MAC=40:A3:CC:4F:31:02`).
 
 New status lines for a failure of this kind:
 

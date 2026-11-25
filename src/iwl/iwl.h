@@ -831,5 +831,7 @@ void   iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);
 void   iwl_te_notif(UCHAR FAR *p, USHORT len);
 void   iwl_mac_reset(void);
 extern USHORT g_tx_ok, g_tx_fail, g_rx_mpdu, g_rx_crc, g_rx_decfail;
+extern USHORT g_tx_last_st, g_tx_last_fail, g_tx_st_hist[4];
+extern ULONG  g_tx_last_rate;
 
 #endif

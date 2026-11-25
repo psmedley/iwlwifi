@@ -63,6 +63,7 @@ int    sta_tx(UCHAR FAR *eth, USHORT len);      /* NDIS data: 0 = queued, -1 = n
 int    sta_eapol_tx(UCHAR FAR *eth, USHORT len);
 USHORT sta_eapol_count(void);
 USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
+extern USHORT g_rx_mgmt[16];                     /* management frames from the AP being joined, by subtype */
 extern USHORT g_rx_eapol, g_rx_ndis, g_rx_nobuf, g_rx_data, g_rx_drop[8], g_tx_data, g_tx_busy;
 
 #endif

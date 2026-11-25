@@ -295,6 +295,9 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    case CMD_INIT_COMPLETE_NOTIF:
       g_init_complete = 1;
       break;
+   case CMD_MCC_CHUB_UPDATE:                      /* the regulatory domain the firmware settled on          */
+   case CMD_MFUART_LOAD_NOTIF:
+      break;
    case CMD_REPLY_RX_PHY:
       iwl_rx_phy(p, len);
       break;
@@ -579,4 +582,6 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps("SCAN n="); ph(g_scan_n, 4); ps(" done="); ph(g_scan_done, 1); ps(" MPDU="); ph(g_rx_mpdu, 4);
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
    ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_tx_queued(), 2); nl();
+   ps("TXST last="); ph(g_tx_last_st, 4); ps(" retries="); ph(g_tx_last_fail, 2); ps(" rate="); ph(g_tx_last_rate, 8);
+   ps(" hist(ok,direct,fail,other)="); for (i = 0; i < 4; i++) { ph(g_tx_st_hist[i], 4); ps(i < 3 ? "," : ""); } nl();
 }

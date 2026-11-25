@@ -16,8 +16,8 @@ NASM; no IBM DDK is needed.
 > registers with NDIS, the firmware file is accepted, and bring-up gets through both firmware images (INIT and
 > runtime, with paging), the NVM (MAC address, 26 channels, 2.4/5 GHz, 11n/11ac, LAR), calibration (15 PHY DB
 > sections), DQA, the auxiliary station and the PHY context, with working interrupts. It then stopped on a firmware
-> error at the power/temperature commands; see [docs/TESTING.md](docs/TESTING.md), "Hardware results". Scanning and
-> joining have not been reached yet. A COM1 cable helps but is not required: the driver state can be read from
+> error at the power/temperature commands (fixed in the next run); see [docs/TESTING.md](docs/TESTING.md), "Hardware
+> results". Run 2 reached `READY` and scanned 2.4 and 5 GHz (16 access points). Joining has not been tried yet. A COM1 cable helps but is not required: the driver state can be read from
 > `\DEV\WRND32$`.
 
 ## What it does

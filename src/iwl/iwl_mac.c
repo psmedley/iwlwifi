@@ -17,6 +17,8 @@
 #include "iwl.h"
 
 USHORT g_tx_ok, g_tx_fail, g_rx_mpdu, g_rx_crc, g_rx_decfail;
+USHORT g_tx_last_st, g_tx_last_fail, g_tx_st_hist[4];
+ULONG  g_tx_last_rate;
 
 static USHORT g_mac_on, g_bind_on, g_sta_on, g_te_on, g_assoc_on;
 static ULONG  g_te_uid;
@@ -296,9 +298,13 @@ static int send_lq(void)
    c.agg_frame_cnt_limit = 0x3F;
    if (g_jht) {                                    /* HT single stream MCS 7 .. 0 the AP can receive           */
       for (m = 8; m-- > 0 && j < 16; )
-         if (g_jht_mcs[0] & (1 << m))
-            c.rs_table[j++] = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK |
-                              ((g_ap_ht_sgi20 && j < 2) ? RATE_MCS_SGI_MSK : 0UL);
+         if (g_jht_mcs[0] & (1 << m)) {
+            ULONG f = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK;
+
+            if (g_ap_ht_sgi20 && j < 2)             /* the first attempts may use the short guard interval    */
+               f |= RATE_MCS_SGI_MSK;
+            c.rs_table[j++] = f;
+         }
    } else {                                        /* the AP's legacy rates, fastest first                     */
       for (i = 11; i >= 0 && j < 16; i--) {
          if (i < 4 && (hi || !(g_ap_rates_cck & (1 << i))))
@@ -568,6 +574,10 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    if (len < sizeof(tx_resp_t))
       return;
    st = (USHORT)(get16(p + 36) & TX_STATUS_MSK);
+   g_tx_last_st = get16(p + 36);                   /* full status word                                       */
+   g_tx_last_fail = p[3];                          /* failure_frame: retries that failed                     */
+   g_tx_last_rate = get32(p + 4);                  /* initial_rate                                           */
+   g_tx_st_hist[(st == TX_STATUS_SUCCESS) ? 0 : (st == TX_STATUS_DIRECT_DONE) ? 1 : (st < 0x80) ? 2 : 3]++;
    if (st == TX_STATUS_SUCCESS || st == TX_STATUS_DIRECT_DONE)
       g_tx_ok++;
    else
