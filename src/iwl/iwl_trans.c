@@ -376,9 +376,11 @@ static void rx_buffer(USHORT i)
          q->tail = (USHORT)((p[6] + 1) & 0xFF);
          iwl_cmd_answer(code, p[6], p[5], p + 8, (USHORT)(plen - 4));
       }
-      put32(p, FH_RSCSR_FRAME_INVALID);                 /* consumed: this buffer is reused, stale packets must never replay */
       off = (USHORT)(off + ((total + FH_RSCSR_FRAME_ALIGN - 1) & ~(FH_RSCSR_FRAME_ALIGN - 1)));
    }
+   /* The buffer goes back to the device: clear it, so that what the next packets do not overwrite (aggregates differ in
+    * size, packet boundaries move) can never be read as a packet. An all-zero header ends the loop above. */
+   rt_setmem((PVOID)b, 0, RBUF_SIZE);
 }
 
 static void rx_service(void)

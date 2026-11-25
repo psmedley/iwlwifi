@@ -140,6 +140,15 @@ firmware, CRC or decryption errors; `txbusy=0`; `UNHANDLED=0`. Download about 4.
 plain LLC header (NetBEUI, NetBIOS over LLC, bridge BPDUs), which the driver now converts instead (`8023 rx= tx=`
 in the `DATA` line counts them).
 
+**Run 5** (build 085a99b: receive aggregation): on 2.4 GHz channel 11, HT20 with two streams (`rate=0000E10F`, MCS 15,
+144 Mbit/s), download above 6.5 MB/s (3.3 MB/s on the same channel with one stream and no aggregation).
+`BA sessions=2 refused=0`, `ASYNC ok=2 fail=0`, `direct=50096 reordered=1055 old=472 dup=0 timeouts=0 maxheld=17`: the
+AP's two block-ack sessions were accepted, 2% of the frames needed reordering, the 0.9% `old` are retransmissions of
+frames already delivered, no hole ever timed out. No firmware, CRC or decryption errors. Two things seen: `UNHANDLED`
+grew to 2949 with last code 0000 (it was 0 before aggregation: leftover bytes in reused receive buffers, now cleared
+after use; the `UNH` line records what they are), and `drop[6]=32` frames not LLC/SNAP (that build did not yet carry
+IEEE 802.3 frames: see run 4).
+
 New status lines for a failure of this kind:
 
 * `CMDS=n (oldest first, id/result/info): ...` the last 12 host commands: `id` (group in the high byte), result

@@ -14,6 +14,8 @@ USHORT g_hw_ready, g_hw_failed, g_hw_state;
 UCHAR  g_hw_mac[6], g_hw_nss = 1;
 USHORT g_init_complete, g_calib_complete;
 static USHORT g_unhandled, g_last_unhandled, g_fw_errors_seen;
+static USHORT g_unh_qid, g_unh_idx, g_unh_len, g_unh_by[256];
+static UCHAR  g_unh_d[8];
 static ULONG  g_last_fw_err, g_last_fw_err_cmd;
 
 /* ---- antennas --------------------------------------------------------------------------------------- */
@@ -340,6 +342,12 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
       if (qid & 0x80) {                            /* an unsolicited notification we do not use              */
          g_unhandled++;
          g_last_unhandled = code;
+         g_unh_qid = qid;
+         g_unh_idx = idx;
+         g_unh_len = len;
+         fmemcpy((UCHAR FAR *)g_unh_d, p, (USHORT)(len < 8 ? len : 8));
+         if (code < 256 && g_unh_by[code] < 0xFFFF)
+            g_unh_by[code]++;
       }
       break;
    }
@@ -551,6 +559,16 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps("SVC="); ph(g_svc_runs, 4); ps(" RXPKT="); ph(g_rx_pkts, 4); ps(" RXBAD="); ph(g_rx_bad, 4);
    ps(" RXCUR="); ph(iwl_rx_cur(), 2); ps(" LASTCODE="); ph(g_last_code, 4); ps(" UNHANDLED="); ph(g_unhandled, 4);
    ps("/"); ph(g_last_unhandled, 4); ps(" CMDTO="); ph(g_cmd_to, 4); nl();
+   if (g_unhandled) {                              /* what the notifications we do not use are                */
+      USHORT n = 0;
+
+      ps("UNH last code="); ph(g_last_unhandled, 4); ps(" qid="); ph(g_unh_qid, 2); ps(" idx="); ph(g_unh_idx, 2);
+      ps(" len="); ph(g_unh_len, 4); ps(" data="); for (i = 0; i < 8; i++) ph(g_unh_d[i], 2);
+      ps(" by code:");
+      for (i = 0; i < 256 && n < 6; i++)
+         if (g_unh_by[i]) { ps(" "); ph(i, 2); ps("x"); ph(g_unh_by[i], 4); n++; }
+      nl();
+   }
    ps("FWERR="); ph(g_fw_error, 4); ps(" HWERR="); ph(g_hw_err, 4); ps(" REPLYERR="); ph(g_fw_errors_seen, 4);
    ps(" type="); ph(g_last_fw_err, 8); ps(" cmd="); ph(g_last_fw_err_cmd, 2); nl();
    ps("CMDS="); ph(g_clog_n, 4); ps(" (oldest first, id/result/info):");
