@@ -17,7 +17,9 @@ NASM; no IBM DDK is needed.
 > runtime, with paging), the NVM (MAC address, 26 channels, 2.4/5 GHz, 11n/11ac, LAR), calibration (15 PHY DB
 > sections), DQA, the auxiliary station and the PHY context, with working interrupts. It then stopped on a firmware
 > error at the power/temperature commands (fixed in the next run); see [docs/TESTING.md](docs/TESTING.md), "Hardware
-> results". Run 2 reached `READY` and scanned 2.4 and 5 GHz (16 access points). Joining has not been tried yet. A COM1 cable helps but is not required: the driver state can be read from
+> results". Run 2 reached `READY` and scanned 2.4 and 5 GHz (16 access points). **Run 3: it joins a WPA2-PSK
+> network, gets an address and passes traffic, about 3.3 MB/s downloading** (2.4 GHz channel 11, one stream, 20 MHz,
+> no aggregation). A COM1 cable helps but is not required: the driver state can be read from
 > `\DEV\WRND32$`.
 
 ## What it does

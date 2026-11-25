@@ -525,6 +525,11 @@ static void pi_line(char *l)
          g_maxw = (UCHAR)(w >= 80 ? 2 : (w >= 40 ? 1 : 0));
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "streams")) {       /* STREAMS = 1 | 2: spatial streams to use (default 2)  */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_maxnss = (UCHAR)(*v == '1' ? 1 : 2);
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "channel")) {       /* CHANNEL = n: join only an access point on that primary channel */
          USHORT w = 0;
 

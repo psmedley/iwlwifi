@@ -169,8 +169,6 @@ USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
 #define NTXQ        6                           /* cmd, aux, 4 data (one per access category)            */
 #define CMD_SLOTS   32
 #define CMD_SLOT_SZ (4 + DEF_CMD_PAYLOAD_SIZE)  /* header + payload                                       */
-#define TX_SLOTS    16                          /* frames in flight on the data queue                     */
-#define TX_SLOT_SZ  2048
 
 typedef struct {
    USHORT qid;

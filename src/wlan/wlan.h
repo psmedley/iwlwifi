@@ -39,6 +39,7 @@ extern UCHAR  g_jht_mcs[2];                     /* the AP's HT rx MCS bytes from
 extern UCHAR  g_jrates[12];                     /* the AP's legacy rates (association response), 802.11 units */
 extern USHORT g_jnrates;
 extern UCHAR  g_forcech;                        /* PROTOCOL.INI CHANNEL: join only this primary channel      */
+extern UCHAR  g_maxnss;                         /* PROTOCOL.INI STREAMS (1 or 2, default 2)                   */
 extern UCHAR  g_maxw;                           /* PROTOCOL.INI MAXWIDTH (0 20, 1 40, 2 80 MHz)              */
 extern USHORT g_link_lost;
 extern net_t *g_jnet;                           /* the scan entry being joined / joined                       */

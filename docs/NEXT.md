@@ -2,6 +2,9 @@
 
 In order of usefulness once the driver associates on hardware:
 
+0. **Done after the first successful run:** two-stream (MCS 8-15) rates in the rate table when the AP supports them
+   (`STREAMS=` in PROTOCOL.INI), 32 transmit slots instead of 16. Measure whether `STREAMS=1` or `2` is faster.
+
 1. **Rate adaptation.** Today the firmware starts every frame at the top of the rate table and walks down on retries.
    Track `TXOK`/`TXFAIL` per rate from the TX responses (`tx_resp_t.initial_rate`, `failure_frame`) and rebuild the
    table (LQ_CMD) with a lower starting rate, as iwm's AMRR/RA or Linux `mvm/rs.c` do.

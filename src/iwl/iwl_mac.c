@@ -20,6 +20,8 @@ USHORT g_tx_ok, g_tx_fail, g_rx_mpdu, g_rx_crc, g_rx_decfail;
 USHORT g_tx_last_st, g_tx_last_fail, g_tx_st_hist[4];
 ULONG  g_tx_last_rate;
 
+static int two_streams(void);
+
 static USHORT g_mac_on, g_bind_on, g_sta_on, g_te_on, g_assoc_on;
 static ULONG  g_te_uid;
 static UCHAR  g_ptk[16];
@@ -224,7 +226,7 @@ static int add_sta(USHORT update)
    c.tid_disable_tx = 0xFFFF;                      /* no transmit aggregation                                 */
    if (update && g_jht) {
       c.station_flags_msk |= STA_FLG_MAX_AGG_SIZE_MSK | STA_FLG_AGG_MPDU_DENS_MSK;
-      if (g_hw_nss >= 2 && g_jht_mcs[1])
+      if (two_streams())
          c.station_flags |= STA_FLG_MIMO_EN_MIMO2;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
@@ -282,6 +284,12 @@ void iwl_te_notif(UCHAR FAR *p, USHORT len)
 }
 
 /* ---- rate table: the firmware walks it on retries (iwm_set_rate_table, without iwm's rate adaptation) ----- */
+/* The AP receives two streams, the radio has two chains and PROTOCOL.INI (STREAMS) allows it */
+static int two_streams(void)
+{
+   return g_jht && g_hw_nss >= 2 && g_maxnss >= 2 && g_jht_mcs[1] != 0;
+}
+
 static int send_lq(void)
 {
    static lq_cmd_t c;
@@ -296,7 +304,18 @@ static int send_lq(void)
    c.agg_time_limit = 4000;
    c.agg_disable_start_th = 3;
    c.agg_frame_cnt_limit = 0x3F;
-   if (g_jht) {                                    /* HT single stream MCS 7 .. 0 the AP can receive           */
+   if (g_jht) {
+      if (two_streams()) {                         /* two streams first: MCS 15 .. 8, then the single-stream ones */
+         for (m = 8; m-- > 0 && j < 16; )
+            if (g_jht_mcs[1] & (1 << m)) {
+               ULONG f = (ULONG)(8 + m) | RATE_MCS_HT_MSK | RATE_MCS_ANT_AB_MSK;
+
+               if (g_ap_ht_sgi20 && j < 2)
+                  f |= RATE_MCS_SGI_MSK;
+               c.rs_table[j++] = f;
+            }
+         c.mimo_delim = (UCHAR)j;                  /* the first single-stream index                           */
+      }
       for (m = 8; m-- > 0 && j < 16; )
          if (g_jht_mcs[0] & (1 << m)) {
             ULONG f = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK;
@@ -378,7 +397,7 @@ int hw_join_prepare(net_t *n)
 
 int hw_join_complete(void)
 {
-   UCHAR ch = (g_hw_nss >= 2 && g_jht) ? 2 : 1;
+   UCHAR ch = (UCHAR)(two_streams() ? 2 : 1);
 
    scan_rates((UCHAR FAR *)g_jres, g_jreslen, (UCHAR)(g_jch > 14));
    if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch))
@@ -501,7 +520,7 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
    ULONG  fl;
    UCHAR  sub = (UCHAR)(hdr[0] & 0xF0);
 
-   if ((USHORT)(blen + 8) > 2048 - 256)
+   if ((USHORT)(blen + 8) > TX_SLOT_SZ - 256)
       return -3;
    s = iwl_tx_slot(&idx, &ph);
    if (!s)

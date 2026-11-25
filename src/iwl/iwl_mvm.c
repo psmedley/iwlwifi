@@ -295,6 +295,7 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    case CMD_INIT_COMPLETE_NOTIF:
       g_init_complete = 1;
       break;
+   case CMD_STATISTICS_NOTIF:                     /* sent every few hundred ms; not used                    */
    case CMD_MCC_CHUB_UPDATE:                      /* the regulatory domain the firmware settled on          */
    case CMD_MFUART_LOAD_NOTIF:
       break;

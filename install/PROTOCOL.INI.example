@@ -22,3 +22,7 @@
 
    ; Optional: join only an access point on this primary channel (testing).
    ; CHANNEL = 6
+
+   ; Optional: spatial streams to use, 1 or 2 (default 2: the adapter has two antennas). Set 1 if two-stream
+   ; rates cause trouble with a particular access point.
+   ; STREAMS = 1

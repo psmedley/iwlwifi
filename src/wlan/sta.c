@@ -21,7 +21,7 @@ UCHAR  g_jreq[200], g_jres[160];
 USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
 UCHAR  g_jht, g_jht_mcs[2], g_jrates[12];
 USHORT g_jnrates;
-UCHAR  g_forcech, g_maxw;
+UCHAR  g_forcech, g_maxw, g_maxnss = 2;
 USHORT g_link_lost;
 net_t *g_jnet;
 USHORT g_rx_mgmt[16];

@@ -103,6 +103,14 @@ configurations, `00D2`, SCAN_REQ `010D`). The scan found 16 access points (RSSI 
 by the Wireless LAN Monitor while the adapter was not ready (before the fix). The Monitor's `GET` requests now get
 answers and the MAC is set (`MAC=40:A3:CC:4F:31:02`).
 
+**Run 3** (build a506edf plus the CRLF fix): joined `smedleywan` on 2.4 GHz channel 11 (AID 5, WPA2-PSK, HT, `PTK
+AUTHORIZED`), 41,716 frames received and 10,121 sent in one session, no decryption failures, no CRC errors, no
+firmware errors; the last transmit was MCS 7, short GI, no retries (-39 dBm). `MGMTRX=` shows one association
+response, one authentication and two action frames (the ADDBA requests we refuse). Download speed about 3.3 MB/s.
+Three observations: 408 sends were refused because all 16 transmit slots were busy (now 32); 1,869 firmware
+statistics notifications were counted as unhandled (now ignored); 96 received frames were dropped as "not
+LLC/SNAP" (`drop[6]`), not yet understood and not important at this rate.
+
 New status lines for a failure of this kind:
 
 * `CMDS=n (oldest first, id/result/info): ...` the last 12 host commands: `id` (group in the high byte), result

@@ -241,6 +241,8 @@ extern char *g_devname;
 #define TID_NON_QOS             0
 #define FRAME_LIMIT             64
 
+#define TX_SLOTS                32              /* data frames in flight (a divisor of the 256-entry ring)   */
+#define TX_SLOT_SZ              1792U           /* command (<= 256 bytes) + CCMP header + 1514-byte frame      */
 #define RX_RING_COUNT           256             /* hardware ring of receive buffer descriptors            */
 #define RX_NBUF                 64              /* buffers actually posted                                */
 #define RBUF_SIZE               4096
