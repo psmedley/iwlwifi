@@ -224,3 +224,9 @@ at the current rung; every 200 ms the transmit results move the rung (`RATE` sta
 `first=` the rate word at that rung, `up=`/`down=` moves, `lastok%=` share of attempts that succeeded. `RATEADAPT = 0` in
 PROTOCOL.INI keeps the first rung. Expect the rung to settle a few steps down on a weak link; with VHT80 and a good
 link, `first=` should show MCS 7-9 for two streams (rate word ends in 17, 18 or 19 with bit 4 set).
+
+**Run 12** (build c002b36, VHT80 with rate adaptation): download about 10 MB/s (12 MB/s for short stretches), upload
+9.6 MB/s. `RATE rung=01/10 first=4400F018` (two streams, MCS 8, 80 MHz), `lastok%` 61-78, up/down moves every few
+seconds. 80 MHz is not faster than HT40 here (10.5-11 down, 10.7 up): the radio is no longer the limit at about
+100 Mbit/s, so the ceiling is in the host path (stack, copies, per-frame work) or the AP/server. Failed probes of a
+faster rate now back off (3 s, doubling up to 30 s).

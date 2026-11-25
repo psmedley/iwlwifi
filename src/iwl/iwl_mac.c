@@ -344,7 +344,7 @@ static ULONG vht_flags(void)
 static ULONG  g_lad[LAD_MAX];
 static USHORT g_lad_n, g_lad_delim;               /* rungs; the first single-stream rung                         */
 static USHORT g_rs_cur, g_rs_good, g_rs_bad, g_rs_probe;
-static ULONG  g_rs_t, g_rs_block;
+static ULONG  g_rs_t, g_rs_block, g_rs_hold = 3000UL;   /* how long a rate that failed stays blocked: doubles on each failed probe */
 USHORT g_rs_up, g_rs_down, g_rs_pct;
 
 static void ladder_build(void)
@@ -423,6 +423,7 @@ static int send_lq(void)
    ladder_build();
    g_rs_cur = g_rs_good = g_rs_bad = g_rs_probe = 0;
    g_rs_block = 0;
+   g_rs_hold = 3000UL;
    g_rs_t = dd_ms();
    return lq_send(0, 0);
 }
@@ -481,7 +482,10 @@ void rs_tick(void)                                /* service path, after every r
       g_rs_down++;
    } else if (g_rs_probe && pct < 75) {            /* the probe of a faster rate did not hold                      */
       g_rs_cur++;
-      g_rs_block = now + 5000UL;
+      g_rs_hold += g_rs_hold;                      /* the faster rate does not hold: try it less often           */
+      if (g_rs_hold > 30000UL)
+         g_rs_hold = 30000UL;
+      g_rs_block = now + g_rs_hold;
       g_rs_probe = 0;
       g_rs_down++;
    } else if (pct >= 92 && g_rs_cur > 0 && (long)(now - g_rs_block) >= 0L) {
