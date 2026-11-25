@@ -553,6 +553,11 @@ static void pi_line(char *l)
          g_aggtx = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "powersave")) {     /* POWERSAVE = 0 | 1: 802.11 power save (default 0)       */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_powersave = (UCHAR)(*v == '1' ? 1 : 0);
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "rateadapt")) {     /* RATEADAPT = 0 | 1: host rate adaptation (default 1)    */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_rateadapt = (UCHAR)(*v == '0' ? 0 : 1);

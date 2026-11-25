@@ -517,6 +517,11 @@ static int send_mac_power(void)
    c.id_and_color = ID_AND_COLOR(0, 0);
    c.keep_alive_seconds = secs;
    c.flags = 0;                                    /* no power save (constantly awake)                         */
+   if (g_powersave) {                              /* iwm_power_build_cmd / Linux iwl_mvm_power_build_cmd (no U-APSD, no snooze) */
+      c.flags = POWER_FLAGS_POWER_SAVE_ENA_MSK | POWER_FLAGS_POWER_MANAGEMENT_ENA_MSK;
+      c.rx_data_timeout = PS_DATA_TIMEOUT_US;
+      c.tx_data_timeout = PS_DATA_TIMEOUT_US;
+   }
    return iwl_cmd1(CMD_MAC_PM_POWER_TABLE, (UCHAR FAR *)&c, sizeof(c));
 }
 

@@ -230,3 +230,10 @@ link, `first=` should show MCS 7-9 for two streams (rate word ends in 17, 18 or 
 seconds. 80 MHz is not faster than HT40 here (10.5-11 down, 10.7 up): the radio is no longer the limit at about
 100 Mbit/s, so the ceiling is in the host path (stack, copies, per-frame work) or the AP/server. Failed probes of a
 faster rate now back off (3 s, doubling up to 30 s).
+
+## 5g. Power save
+
+`POWERSAVE = 1` in PROTOCOL.INI sends the firmware the power-save settings (device and MAC power commands: power
+management enabled, 100 ms awake time after any frame in either direction, no U-APSD). The status line `POWER save=`
+shows the setting. Expect: first ping after a pause a few ms slower (the beacon interval); bulk transfers unchanged.
+If throughput drops or the link stalls with `POWERSAVE = 1`, send the status and turn it off (the default).

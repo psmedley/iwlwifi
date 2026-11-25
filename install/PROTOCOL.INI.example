@@ -37,3 +37,6 @@
    ; AGGTX = 0
    ; Optional: host rate adaptation, 0 or 1 (default 1). 0 always starts at the fastest rate (the old behaviour).
    ; RATEADAPT = 0
+   ; Optional: 802.11 power save, 0 or 1 (default 0: always awake, fastest). 1 lets the adapter sleep between
+   ; frames (stays awake 100 ms after each frame); saves power on a laptop, adds a little latency.
+   ; POWERSAVE = 1

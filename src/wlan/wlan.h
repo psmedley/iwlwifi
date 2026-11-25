@@ -68,6 +68,7 @@ int    sta_tx(UCHAR FAR *eth, USHORT len);      /* NDIS data: 0 = queued, -1 = n
 int    sta_eapol_tx(UCHAR FAR *eth, USHORT len);
 USHORT sta_eapol_count(void);
 USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
+extern UCHAR  g_powersave;                        /* PROTOCOL.INI POWERSAVE = 1 enables 802.11 power save (default 0) */
 extern UCHAR  g_rateadapt;                       /* PROTOCOL.INI RATEADAPT = 0 turns host rate adaptation off  */
 extern UCHAR  g_aggtx;                          /* PROTOCOL.INI AGGTX = 0 turns transmit aggregation off       */
 extern USHORT g_atx_req, g_atx_ok, g_atx_refused, g_atx_timeout, g_atx_delba, g_tx_qos;

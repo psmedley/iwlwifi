@@ -601,6 +601,10 @@ typedef struct { ULONG id_and_color, quota, max_duration, low_latency; } quota_t
 #define MAX_BINDINGS            4
 #define MAX_QUOTA               128
 
+#define DEVICE_POWER_FLAGS_POWER_SAVE_ENA_MSK 0x0001
+#define POWER_FLAGS_POWER_SAVE_ENA_MSK        0x0001
+#define POWER_FLAGS_POWER_MANAGEMENT_ENA_MSK  0x0002
+#define PS_DATA_TIMEOUT_US      100000UL        /* stay awake this long after a frame in either direction       */
 typedef struct { USHORT flags, reserved; } device_power_cmd_t;
 typedef struct {
    ULONG  id_and_color;

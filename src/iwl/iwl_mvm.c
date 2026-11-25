@@ -114,7 +114,7 @@ int iwl_send_power(void)
 {
    static device_power_cmd_t d;
 
-   d.flags = 0;                                    /* no POWER_SAVE_ENA: continuously aware mode            */
+   d.flags = g_powersave ? DEVICE_POWER_FLAGS_POWER_SAVE_ENA_MSK : 0;   /* 0: continuously aware mode (CAM)    */
    d.reserved = 0;
    return iwl_cmd1(CMD_POWER_TABLE, (UCHAR FAR *)&d, sizeof(d));
 }
@@ -604,6 +604,7 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps("SCAN n="); ph(g_scan_n, 4); ps(" done="); ph(g_scan_done, 1); ps(" MPDU="); ph(g_rx_mpdu, 4);
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
    ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_txq_queued(QI_BE), 2); nl();
+   ps("POWER save="); ph(g_powersave, 1); nl();
    rs_status(ps, ph, nl);
    txa_status(ps, ph, nl);
    ps("ASYNC ok="); ph(g_async_ok, 4); ps(" fail="); ph(g_async_fail, 4); nl();
