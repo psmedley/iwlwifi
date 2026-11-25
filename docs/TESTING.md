@@ -133,6 +133,13 @@ Three observations: 408 sends were refused because all 16 transmit slots were bu
 statistics notifications were counted as unhandled (now ignored); 96 received frames were dropped as "not
 LLC/SNAP" (`drop[6]`), not yet understood and not important at this rate.
 
+**Run 4** (build 4d8657e, HT40 but not yet receive aggregation): joined `smedleywan` on 5 GHz channel 149 (`HT40
+NSS=2 SCO=1`), last transmit `rate=4000E90F` = MCS 15, 40 MHz, short GI, two antennas (300 Mbit/s), no retries; no
+firmware, CRC or decryption errors; `txbusy=0`; `UNHANDLED=0`. Download about 4.7 MB/s (was 3.3 MB/s on 2.4 GHz channel
+11, 20 MHz, one stream). 75 received frames were dropped as "not LLC/SNAP"; these are probably IEEE 802.3 frames with a
+plain LLC header (NetBEUI, NetBIOS over LLC, bridge BPDUs), which the driver now converts instead (`8023 rx= tx=`
+in the `DATA` line counts them).
+
 New status lines for a failure of this kind:
 
 * `CMDS=n (oldest first, id/result/info): ...` the last 12 host commands: `id` (group in the high byte), result

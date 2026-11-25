@@ -149,7 +149,9 @@ from `iwl/iwl_mac.c` in the order iwm uses:
 4. **keys**: ADD_STA_KEY (v1, 64 bytes, for this firmware) with CCM; pairwise at key offset 0, group keys at
    1 + key index with the multicast flag. The firmware decrypts received frames (status MIC_OK); the transmit side puts
    the CCMP header (packet number) in front of the payload and the pairwise key into the TX command.
-5. **data**: non-QoS data frames, To-DS, LLC/SNAP, sequence numbers from the driver (`TX_CMD_FLG_SEQ_CTL`), the rate
+5. **data**: non-QoS data frames, To-DS, LLC/SNAP (Ethernet II frames get RFC 1042 SNAP, AppleTalk-ARP and IPX the
+   bridge-tunnel variant; IEEE 802.3 frames, whose "type" is a length, go out with their own LLC header unchanged:
+   `llc_to_eth` / `eth_to_llc`, tested by `sh tests/llc/run.sh`), sequence numbers from the driver (`TX_CMD_FLG_SEQ_CTL`), the rate
    from the rate table (`STA_RATE`). Received QoS and non-QoS data frames are converted to Ethernet; the CCMP header and
    the 8-byte MIC the firmware leaves in place are removed. EAPOL goes to the supplicant's queue.
 6. **Receive aggregation.** The AP's ADDBA request (action frame) is accepted when `AMPDU` allows it, the link is up

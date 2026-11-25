@@ -308,7 +308,7 @@ static void build_status(void)
    ps(g_authorized ? " AUTHORIZED" : ""); ps(g_jht ? (g_j40 ? " HT40" : " HT20") : " legacy"); ps(" NSS="); ph(g_jnss, 1); ps(" SCO="); ph(g_jsco, 1); nl();
    ps("DATA rx="); ph(g_rx_data, 4); ps(" ndis="); ph(g_rx_ndis, 4); ps(" eapol="); ph(g_rx_eapol, 4);
    ps(" nobuf="); ph(g_rx_nobuf, 4); ps(" drop="); for (i = 0; i < 8; i++) { ph(g_rx_drop[i], 4); ps(i < 7 ? "," : ""); }
-   ps(" tx="); ph(g_tx_data, 4); ps(" txbusy="); ph(g_tx_busy, 4); ps(" EAPOLQ="); ph(sta_eapol_count(), 2); nl();
+   ps(" 8023 rx="); ph(g_rx_8023, 4); ps(" 8023 tx="); ph(g_tx_8023, 4); ps(" tx="); ph(g_tx_data, 4); ps(" txbusy="); ph(g_tx_busy, 4); ps(" EAPOLQ="); ph(sta_eapol_count(), 2); nl();
    ps("NDIS reg="); ph(ndis_state(8), 1); ps(" status="); ph(ndis_state(0), 4); ps(" filter="); ph(ndis_state(1), 4);
    ps(" rxbufs="); ph(ndis_state(6), 2); ps(" txbuf="); ph(ndis_state(7), 1); ps(" tx="); ph(ndis_state(2), 4);
    ps(" txhw="); ph(ndis_state(3), 4); ps(" rx="); ph(ndis_state(4), 4); ps(" nobuf="); ph(ndis_state(5), 4); nl();

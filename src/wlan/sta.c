@@ -26,6 +26,7 @@ UCHAR  g_forcech, g_maxw = 2, g_maxnss = 2;      /* MAXWIDTH: 0 = 20, 1 or more 
 USHORT g_link_lost;
 net_t *g_jnet;
 USHORT g_rx_mgmt[16];
+USHORT g_rx_8023, g_tx_8023;
 USHORT g_rx_eapol, g_rx_ndis, g_rx_nobuf, g_rx_data, g_rx_drop[8], g_tx_data, g_tx_busy;
 
 static USHORT g_auth_rx, g_auth_status, g_assoc_rx, g_assoc_status, g_assoc_aid, g_assoc_caps, g_assoc_reslen;
@@ -586,6 +587,56 @@ void sta_lost(void)
       g_link_lost = 1;
 }
 
+/* ---- Ethernet <-> 802.11 payload conversion (RFC 1042 / IEEE 802.1H, as mac80211 does it) ---------------------
+ * An Ethernet II frame (type >= 0600h) travels with a SNAP header AA AA 03 00 00 00 + type; AppleTalk ARP (80F3h) and
+ * IPX (8137h) use the bridge-tunnel variant (OUI 00 00 F8) so that the receiver does not mistake them for
+ * RFC 1042. An IEEE 802.3 frame (the "type" is the length of what follows: NetBEUI, NetBIOS over LLC, bridge BPDUs)
+ * travels with its own LLC header, unchanged. */
+/* LLC_BEGIN */
+/* The LLC part of an 802.11 data frame -> an Ethernet frame in eth (after the 12 address bytes): returns the
+ * number of bytes written after the addresses, or 0 when the LLC header is unusable. */
+static USHORT llc_to_eth(UCHAR FAR *llc, USHORT plen, UCHAR FAR *eth, USHORT FAR *is8023)
+{
+   USHORT et;
+
+   *is8023 = 0;
+   if (plen < 3)
+      return 0;
+   if (plen >= 8 && llc[0] == 0xAA && llc[1] == 0xAA && llc[2] == 0x03 && llc[3] == 0 && llc[4] == 0) {
+      et = (USHORT)((llc[6] << 8) | llc[7]);
+      if ((llc[5] == 0x00 && et != 0x80F3 && et != 0x8137) || llc[5] == 0xF8) {
+         fmemcpy(eth + 12, llc + 6, (USHORT)(plen - 6));      /* type + payload                                */
+         return (USHORT)(plen - 6);
+      }
+   }
+   if (plen > 1500)
+      return 0;
+   eth[12] = (UCHAR)(plen >> 8);                       /* IEEE 802.3: the length, then the LLC header as it is */
+   eth[13] = (UCHAR)plen;
+   fmemcpy(eth + 14, llc, plen);
+   *is8023 = 1;
+   return (USHORT)(plen + 2);
+}
+
+/* An Ethernet frame -> the LLC part of an 802.11 data frame: eth[6..11] may be overwritten (SNAP header). Returns
+ * the start of the part to send; its length is *blen. */
+static UCHAR FAR *eth_to_llc(UCHAR FAR *eth, USHORT len, USHORT FAR *blen, USHORT FAR *is8023)
+{
+   USHORT et = (USHORT)((eth[12] << 8) | eth[13]);
+
+   *is8023 = 0;
+   if (et < 0x0600) {                                  /* IEEE 802.3: already has its LLC header              */
+      *is8023 = 1;
+      *blen = (USHORT)(len - 14);
+      return eth + 14;
+   }
+   eth[6] = 0xAA; eth[7] = 0xAA; eth[8] = 0x03; eth[9] = 0; eth[10] = 0;
+   eth[11] = (UCHAR)((et == 0x80F3 || et == 0x8137) ? 0xF8 : 0x00);
+   *blen = (USHORT)(len - 6);
+   return eth + 6;
+}
+/* LLC_END */
+
 /* ---- receive ----------------------------------------------------------------------------------------- */
 #define EQ_N   4
 #define EQ_SZ  512
@@ -648,7 +699,7 @@ static void rx_eth(UCHAR FAR *eth, USHORT len)
 void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxflags, ULONG rxtime)
 {
    UCHAR  fc0, fc1, type, tid;
-   USHORT hl;
+   USHORT hl, elen;
    int    bi;
 
    if (len < 24)
@@ -697,22 +748,27 @@ void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxfla
       if (len < hl + 8) { g_rx_drop[4]++; return; }
       len = (USHORT)(len - 8);
    }
-   if (len < hl + 8 || (USHORT)(len - hl - 8 + 14) > sizeof(g_eth)) {
+   if (len < hl + 3 || (USHORT)(len - hl + 14) > sizeof(g_eth)) {
       g_rx_drop[4]++;
-      return;
-   }
-   if (f[hl] != 0xAA || f[hl + 1] != 0xAA || f[hl + 2] != 0x03) {
-      g_rx_drop[6]++;                                  /* not LLC/SNAP                                      */
       return;
    }
    fmemcpy((UCHAR FAR *)g_eth, f + 4, 6);              /* destination = address 1                           */
    fmemcpy((UCHAR FAR *)g_eth + 6, f + 16, 6);         /* source = address 3 (From-DS)                      */
-   fmemcpy((UCHAR FAR *)g_eth + 12, f + hl + 6, (USHORT)(len - hl - 6));   /* ethertype + payload               */
+   {
+      USHORT n8023, n = llc_to_eth(f + hl, (USHORT)(len - hl), (UCHAR FAR *)g_eth, &n8023);
+
+      if (!n) {
+         g_rx_drop[6]++;                               /* no usable LLC header                              */
+         return;
+      }
+      g_rx_8023 += n8023;
+      elen = (USHORT)(n + 12);
+   }
    bi = (tid < 8 && !(f[4] & 1)) ? ba_find(tid) : -1;   /* unicast QoS data of a block-ack session: in order   */
    if (bi >= 0)
-      ba_input((USHORT)bi, &g_ba[bi], (USHORT)(get16(f + 22) >> 4), (UCHAR FAR *)g_eth, (USHORT)(len - hl - 6 + 12));
+      ba_input((USHORT)bi, &g_ba[bi], (USHORT)(get16(f + 22) >> 4), (UCHAR FAR *)g_eth, elen);
    else
-      rx_eth((UCHAR FAR *)g_eth, (USHORT)(len - hl - 6 + 12));
+      rx_eth((UCHAR FAR *)g_eth, elen);
    (void)rssi;
 }
 
@@ -740,8 +796,18 @@ static int tx_eth(UCHAR FAR *eth, USHORT len, USHORT flags)
    fmemcpy((UCHAR FAR *)g_hdr + 10, eth + 6, 6);                    /* transmitter = source                 */
    fmemcpy((UCHAR FAR *)g_hdr + 16, eth, 6);                        /* destination                          */
    seq_put((UCHAR FAR *)g_hdr);
-   eth[6] = 0xAA; eth[7] = 0xAA; eth[8] = 0x03; eth[9] = 0; eth[10] = 0; eth[11] = 0;
-   rc = hw_data_tx((UCHAR FAR *)g_hdr, 24, eth + 6, (USHORT)(len - 6), flags);
+   {
+      USHORT blen, n8023;
+      UCHAR FAR *body = eth_to_llc(eth, len, &blen, &n8023);
+
+      g_tx_8023 += n8023;
+      if (blen < 3 || blen > 1536) {                   /* an 802.3 frame without an LLC header, or too long    */
+         rt_lock_release(&g_txlk);
+         rt_irq_restore(fl);
+         return -1;
+      }
+      rc = hw_data_tx((UCHAR FAR *)g_hdr, 24, body, blen, flags);
+   }
    rt_lock_release(&g_txlk);
    rt_irq_restore(fl);
    if (rc == 0)

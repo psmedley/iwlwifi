@@ -69,6 +69,7 @@ USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
 extern UCHAR  g_ampdu;                          /* PROTOCOL.INI AMPDU = 0 turns receive aggregation off        */
 extern USHORT g_ba_started, g_ba_refused, g_ba_stopped, g_ba_rel, g_ba_old, g_ba_dup, g_ba_to, g_ba_max, g_ba_direct;
 void   sta_rx_tick(void);                       /* the service path calls this after every run                 */
+extern USHORT g_rx_8023, g_tx_8023;             /* IEEE 802.3 (LLC, no SNAP) frames: NetBEUI and the like       */
 extern USHORT g_rx_mgmt[16];                     /* management frames from the AP being joined, by subtype */
 extern USHORT g_rx_eapol, g_rx_ndis, g_rx_nobuf, g_rx_data, g_rx_drop[8], g_tx_data, g_tx_busy;
 
