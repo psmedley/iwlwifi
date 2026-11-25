@@ -18,3 +18,17 @@ In order of usefulness once the driver associates on hardware:
 7. **7000 and 9000 families** (docs/ADDING-A-DEVICE.md).
 8. **Firmware error dump**: read the error event table (`ERRTBL=`) through `HBUS_TARG_MEM_*` into the status text
    after a `SW_ERR`, as iwm_nic_error does.
+
+## 9000 family (Intel Wireless-AC 9560, `8086:A370`, CNVi) - plan
+
+The 9560 on the author's second machine is `8086:A370` (Cannon Lake PCH CNVi). Likely firmware:
+`iwlwifi-9000-pu-b0-jf-b0-46.ucode` (version 46, 1,519,568 bytes; SHA-256 9a0c5d93...c3e0), to be confirmed from
+`dmesg | grep iwlwifi` on Linux (which file it loads, the hardware revision). What differs from the 8000 family, using
+Linux 5.4 `pcie/ctxt-info.c`, `pcie/rx.c`, `pcie/trans.c` as the reference:
+1. Stage 1, boot: firmware loaded through the context-info structure (firmware sections placed in DRAM, an image-loader
+   TLV, the card started through CSR/RFH registers), multi-queue receive (RFH registers, "used" and "free" rings), CNVi reset
+   sequence. Goal: `STATE=READY`, firmware version in the status.
+2. Stage 2, scan: command formats of the 9000 firmware (PHY context, scan, TX flags).
+3. Stage 3, join (WPA2): station layer unchanged.
+4. Stage 4, speed: aggregation, VHT, rate adaptation, with the multi-queue receive path.
+Until stage 1 exists the device table lists the IDs as "not supported yet" and the driver ignores them.
