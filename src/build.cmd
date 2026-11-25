@@ -12,5 +12,5 @@ if not exist obj mkdir obj
 for %%f in (hdr lib ndisx end) do nasm -f obj os2\%%f.asm -o obj\%%f.obj
 for %%f in (strat pci mem ndis genmac dbg) do wcc -bt=os2 -2 -obilmr -s -ze -zl -zq -zff -zgf -ms -wx -zp1 -zu -j -i=os2 -i=wlan -i=iwl -fo=obj\%%f.obj os2\%%f.c
 for %%f in (sta) do wcc -bt=os2 -2 -obilmr -s -ze -zl -zq -zff -zgf -ms -wx -zp1 -zu -j -i=os2 -i=wlan -i=iwl -fo=obj\%%f.obj wlan\%%f.c
-for %%f in (iwl_cfg iwl_fw iwl_trans iwl_mvm iwl_nvm iwl_phydb iwl_scan iwl_agg iwl_mac) do wcc -bt=os2 -2 -obilmr -s -ze -zl -zq -zff -zgf -ms -wx -zp1 -zu -j -i=os2 -i=wlan -i=iwl -fo=obj\%%f.obj iwl\%%f.c
+for %%f in (iwl_cfg iwl_fw iwl_trans iwl_mvm iwl_nvm iwl_phydb iwl_scan iwl_agg iwl_ctxt iwl_mac) do wcc -bt=os2 -2 -obilmr -s -ze -zl -zq -zff -zgf -ms -wx -zp1 -zu -j -i=os2 -i=wlan -i=iwl -fo=obj\%%f.obj iwl\%%f.c
 wlink @iwlwifi.lnk

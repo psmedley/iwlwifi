@@ -245,3 +245,18 @@ build was not the one running): download about 10 MB/s (11-12 at times), upload 
 **Run 14** (build 88ba0bc, `POWERSAVE = 1`, VHT80): download 10.1 MB/s (up to 12 at times), upload 9.6 MB/s: the same as
 with power save off. `POWER save=1`, no firmware errors, aggregation and rate adaptation as before (upload settled at
 `rung=03/10 first=...F016`, two streams MCS 6).
+
+## 6. Intel Wireless-AC 9560 (9000 family), stage 1
+
+First build for the 9560 (`8086:A370`, subsystem `4030`). The status shows `ADAPTER=Intel(R) Wireless-AC 9560 160MHz (experimental)`
+and the firmware to copy is `bin\firmware\iwlwifi-9000-pu-b0-jf-b0-46.ucode` (same `copy /b ... \DEV\WRND32$` line as for the
+8260; the driver and `IWLWIFI.NIF` are the same files). The firmware is loaded by the card's own boot ROM from memory the driver
+prepares (context information), and receive uses two rings (multi-queue receive).
+
+What to send back (the status text, as for the 8260): where it stopped, i.e. the `STATE=` value, the `LASTERR=` line, and the new
+lines `CTXINFO lmac= umac= paging= dram= fail= MQRX rd= wr= told= bufs= bad=` (sections found in the firmware, bytes copied into
+memory, the receive rings) and `SVC= RXPKT=` (whether anything arrived), `ALIVE=`, `CSR_INT=`, `CMDS=`.
+Milestones, in order: `READY` (everything worked), `no ALIVE from the firmware` (the ROM did not start the image: context info
+or interrupt problem), `the NVM could not be read` (firmware runs, INIT works), later steps as on the 8260. A hang or a restart
+of the machine is also a result: say at which message on screen it happened.
+Not tried yet on this card: scan, join, data (stages 2 to 4 in docs/NEXT.md).

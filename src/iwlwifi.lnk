@@ -24,6 +24,7 @@ file obj/iwl_nvm.obj
 file obj/iwl_phydb.obj
 file obj/iwl_scan.obj
 file obj/iwl_agg.obj
+file obj/iwl_ctxt.obj
 file obj/iwl_mac.obj
 file obj/sta.obj
 file obj/ndis.obj

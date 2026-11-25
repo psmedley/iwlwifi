@@ -215,7 +215,7 @@ static int setup_paging(void)
    USHORT  sec, i, pages;
    ULONG   off = 0;
 
-   if (!im->paging_size)
+   if (!im->paging_size || g_cfg->family == IWL_FAM_9000)   /* 9000: the paging memory went in with the context info */
       return 0;
    for (sec = 0; sec < im->nsec; sec++)
       if (im->sec[sec].devoff == PAGING_SEPARATOR_SECTION)
@@ -605,6 +605,8 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
    ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_txq_queued(QI_BE), 2); nl();
    ps("POWER save="); ph(g_powersave, 1); nl();
+   if (g_cfg && g_cfg->family == IWL_FAM_9000)
+      iwl9_status(ps, ph, nl);
    rs_status(ps, ph, nl);
    txa_status(ps, ph, nl);
    ps("ASYNC ok="); ph(g_async_ok, 4); ps(" fail="); ph(g_async_fail, 4); nl();

@@ -874,6 +874,22 @@ void   rs_resp(UCHAR failed_attempts);           /* rate adaptation: transmit re
 void   rs_ba(UCHAR txed, UCHAR done);
 void   rs_tick(void);
 void   rs_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
+/* 9000 family (iwl_ctxt.c) and the hooks it needs in iwl_trans.c */
+int    iwl9_alloc(void);
+void   iwl9_reset(void);
+void   iwl9_rx_init(void);
+void   iwl9_rx_service(void);
+void   iwl9_rx_stop(void);
+int    iwl9_boot(USHORT type);
+void   iwl9_free_images(void);
+void   iwl9_free_all(void);
+void   iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
+ULONG  iwl_rxbuf_phys(USHORT i);
+void   iwl_rx_buffer(USHORT i);
+void   iwl_set_mask(ULONG m);
+ULONG  iwl_rbstat_phys(void);
+UCHAR FAR *iwl_rbstat_ptr(void);
+ULONG  iwl_cmdq_ring_phys(void);
 extern USHORT g_hwtxlk;                         /* the data queues: transmit (any context) and reclaim (service) */
 extern UCHAR  g_ampdu_par;                      /* the AP's HT capabilities A-MPDU parameters (association response) */
 void   iwl_rx_mpdu(UCHAR FAR *p, USHORT len);

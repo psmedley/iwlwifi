@@ -188,11 +188,17 @@ static USHORT g_alloc_done;
 UCHAR FAR    *g_resp;
 USHORT        g_resp_len, g_resp_failed;
 
+ULONG iwl_rxbuf_phys(USHORT i);
 static ULONG rxbuf_phys(USHORT i)
 {
    i &= (RX_NBUF - 1);
    return g_rxblk[i >> 4] + (ULONG)((i & 15) << 12);
 }
+
+ULONG iwl_rxbuf_phys(USHORT i)    { return rxbuf_phys(i); }
+ULONG iwl_rbstat_phys(void)        { return g_rbstat.phys; }
+UCHAR FAR *iwl_rbstat_ptr(void)    { return DPTR(g_rbstat); }
+ULONG iwl_cmdq_ring_phys(void)     { return g_txq[0].tfd.phys; }
 
 static txq_t *txq_of(USHORT qid)
 {
@@ -251,6 +257,8 @@ int iwl_trans_alloc(void)
    for (i = 0; i < RX_NBUF / 16; i++)
       if ((g_rxblk[i] = dma_big_al(0x10000UL, 4096)) == 0UL)
          return -5;
+   if (g_cfg->family == IWL_FAM_9000 && iwl9_alloc())
+      return -6;
    g_resp = DPTR(g_respbuf);
    g_alloc_done = 1;
    return 0;
@@ -270,6 +278,8 @@ static void reset_rings(void)
    fmemset(DPTR(g_sched), 0, (USHORT)(IWL_MAX_QUEUES * TFD_QUEUE_BC_SIZE * 2));
    fmemset(DPTR(g_rbstat), 0, 16);
    g_rxcur = 0;
+   if (g_cfg->family == IWL_FAM_9000)
+      iwl9_reset();
 }
 
 /* ---- interrupts --------------------------------------------------------------------------------------- */
@@ -277,6 +287,11 @@ static void set_mask(ULONG m)
 {
    g_intmask = m;
    iwl_wr(CSR_INT_MASK, m);
+}
+
+void iwl_set_mask(ULONG m)
+{
+   set_mask(m);
 }
 
 static void disable_interrupts(void)
@@ -397,6 +412,11 @@ static void rx_buffer(USHORT i)
    rt_setmem((PVOID)b, 0, RBUF_SIZE);
 }
 
+void iwl_rx_buffer(USHORT i)
+{
+   rx_buffer(i);
+}
+
 static void rx_service(void)
 {
    USHORT hw, wp;
@@ -404,6 +424,10 @@ static void rx_service(void)
 
    if (!g_trans_on)
       return;
+   if (g_cfg->family == IWL_FAM_9000) {           /* multi-queue receive                                    */
+      iwl9_rx_service();
+      return;
+   }
    hw = (USHORT)(get16(DPTR(g_rbstat)) & 0x0FFF);   /* closed_rb_num                                       */
    hw &= (RX_RING_COUNT - 1);
    if (hw == g_rxcur)
@@ -620,6 +644,10 @@ void iwl_stop_device(void)
       }
       iwl_nic_unlock();
    }
+   if (g_cfg->family == IWL_FAM_9000) {
+      iwl9_rx_stop();
+      iwl9_free_all();
+   }
    reset_rings();
    if (g_cfg->family == IWL_FAM_7000) {
       iwl_prph_wr(0x3008UL, 0x00000200UL);       /* APMG_CLK_DIS_REG: DMA clock off                        */
@@ -683,7 +711,10 @@ static int nic_init(void)
    if (g_cfg->family == IWL_FAM_7000)
       iwl_prph_wr(PRPH_APMG_PS_CTRL_REG, (iwl_prph_rd(PRPH_APMG_PS_CTRL_REG) & ~0x03000000UL));   /* VMAIN */
    nic_config();
-   rx_init();
+   if (g_cfg->family == IWL_FAM_9000)
+      iwl9_rx_init();
+   else
+      rx_init();
    if (tx_init())
       return -2;
    iwl_set(CSR_MAC_SHADOW_REG_CTRL, 0x800FFFFFUL);
@@ -799,14 +830,19 @@ int iwl_load_ucode(USHORT type)
    set_mask(CSR_INT_BIT_FH_TX);                   /* only the chunk-done interrupt while loading           */
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
-   if (g_cfg->family != IWL_FAM_8000)             /* 7000 (no CPU2, no secure load) and 9000 are not ported */
+   if (g_cfg->family == IWL_FAM_9000) {           /* the context-info boot                                   */
+      if (iwl9_boot(type))
+         return -5;
+   } else if (g_cfg->family != IWL_FAM_8000)      /* 7000 (no CPU2, no secure load) is not ported            */
       return -2;
-   if (load_firmware_8000(type))
+   else if (load_firmware_8000(type))
       return -3;
    if (hw_wait(&g_alive, 1000) || !g_alive_ok) {
       dd_err(g_alive ? "firmware ALIVE with bad status" : "no ALIVE from the firmware", iwl_rd(CSR_INT));
       return -4;
    }
+   if (g_cfg->family == IWL_FAM_9000)
+      iwl9_free_images();                         /* the device has its copy of the firmware; paging stays     */
    return 0;
 }
 
