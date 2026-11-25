@@ -206,3 +206,8 @@ fails or the link stalls with VHT80, send the status and say which AP; try `MAXW
 one second): the CPU is not the limit; one hook per interrupt (`hooks=E045 irqs=E03E`), average latency under 1 ms.
 The `DRIVER` line now says `phase1 vht80` for builds with 80 MHz support, and a `WIDTH` line shows what the AP offers
 (`vhtcaps`, `vht80`, `centre`) and what the adapter allows (`nvm80`, `nvm40`).
+
+**Run 10** (build 78d7b87, first VHT80 attempt): the firmware crashed (`FWLOG id=00002078 data=...,04004009`), after which
+every join failed (`JFAIL=09`, all commands `FFF9`). `04004009` is a rate word: VHT, antenna A, MCS 9. The rate table
+sent after the 80 MHz join contained a one-stream MCS 9 entry for the later retries, which run at 20 MHz, where VHT
+MCS 9 does not exist for one or two streams. Fixed: those entries are capped at MCS 8.

@@ -367,6 +367,8 @@ static int send_lq(void)
       }
       c.mimo_delim = (UCHAR)j;
       top = vht_max_mcs(1);
+      if (top > 8 && j >= 2)
+         top = 8;                                  /* later attempts use 20 MHz, where MCS 9 does not exist for 1-2 streams: the firmware asserts */
       for (k = 0; top >= 0 && k < 8 && top - k >= 0 && j < 16; k++)
       {
          ULONG f = (ULONG)(top - k) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_A_MSK | vht_wide(j);
