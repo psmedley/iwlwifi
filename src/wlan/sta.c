@@ -763,7 +763,7 @@ static UCHAR FAR *eth_to_llc(UCHAR FAR *eth, USHORT len, USHORT FAR *blen, USHOR
 #define EQ_SZ  512
 static UCHAR  g_eq[EQ_N][EQ_SZ];
 static USHORT g_eql[EQ_N], g_eqh, g_eqt, g_eqn, g_eq_drop;
-static UCHAR  g_eth[1520];
+static UCHAR  g_eth[1600];                          /* Ethernet frame built from an 802.11 one (the LLC header shrinks it) */
 
 USHORT sta_eapol_count(void)
 {

@@ -172,3 +172,8 @@ New status lines for a failure of this kind:
   `data=` three error-specific words, `lastcmdid=`/`hcmd=` the command it was handling). Please send these.
 
 Please send the full `copy \DEV\WRND32$ con` output and the COM1 log with any report.
+
+**Run 6** (build c5117e4): downloads and `ls` on an SMB share stalled, small exchanges worked. Cause: the receive check
+`len - hl + 14 > sizeof(g_eth)` (added with the 802.3 conversion) counted the 8-byte LLC/SNAP header as if it stayed, so
+every full-size frame (1500-byte IP packet = 1522 > 1520) was dropped (`drop[4]` counts these). `g_eth` is now 1600 bytes.
+`AMPDU = 0` and `MAXWIDTH = 20` did not help, which pointed away from aggregation.
