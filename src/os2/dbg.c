@@ -307,6 +307,13 @@ static void build_status(void)
    ps("LINK="); ps(g_joined ? "JOINED " : "none "); ph(g_jch, 2); ps(" AID="); ph(g_jaid, 4);
    ps(" JFAIL="); ph(g_jfail, 2); ps(g_open_net ? " OPEN" : " RSN"); ps(g_ptk_on ? " PTK" : " nokey");
    ps(g_authorized ? " AUTHORIZED" : ""); ps(g_jht ? (g_j80 ? " VHT80" : (g_j40 ? " HT40" : " HT20")) : " legacy"); ps(" NSS="); ph(g_jnss, 1); ps(" SCO="); ph(g_jsco, 1); nl();
+   ps("WIDTH maxwidth="); ph(g_maxw, 1);
+   if (g_jnet) {
+      ps(" ap: vhtcaps="); ph(g_jnet->vht, 1); ps(" vht80="); ph(g_jnet->vhtw, 1); ps(" centre="); ph(g_jnet->vcf0, 2);
+      ps(" ht40="); ph(g_jnet->ht40, 1); ph(g_jnet->htw, 1); ps(" sco="); ph(g_jnet->sco, 1);
+      ps(" nvm80="); ph(hw_chan_vht80(g_jnet->ch), 1); ps(" nvm40="); ph(hw_chan_ht40(g_jnet->ch), 1);
+   }
+   nl();
    ps("DATA rx="); ph(g_rx_data, 4); ps(" ndis="); ph(g_rx_ndis, 4); ps(" eapol="); ph(g_rx_eapol, 4);
    ps(" nobuf="); ph(g_rx_nobuf, 4); ps(" drop="); for (i = 0; i < 8; i++) { ph(g_rx_drop[i], 4); ps(i < 7 ? "," : ""); }
    ps(" 8023 rx="); ph(g_rx_8023, 4); ps(" 8023 tx="); ph(g_tx_8023, 4); ps(" tx="); ph(g_tx_data, 4); ps(" txbusy="); ph(g_tx_busy, 4); ps(" EAPOLQ="); ph(sta_eapol_count(), 2); nl();

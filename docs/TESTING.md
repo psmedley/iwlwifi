@@ -201,3 +201,8 @@ On a 5 GHz AP that advertises VHT with an 80 MHz operating width (and when the N
 link line reads `HT... VHT80 NSS=2`, the last transmit rate (`TXST rate=`) has bit 26 set (VHT, e.g. `0400....`) and
 the width bits 1000h (80 MHz). `MAXWIDTH = 40` (or 20) in PROTOCOL.INI restores the earlier behaviour. If the join
 fails or the link stalls with VHT80, send the status and say which AP; try `MAXWIDTH = 40` to compare.
+
+**Run 9** (build 491ec33, 5 GHz channel 149, HT40): download about 10 MB/s. `service busy worst-second=00A6ms` (17 % of
+one second): the CPU is not the limit; one hook per interrupt (`hooks=E045 irqs=E03E`), average latency under 1 ms.
+The `DRIVER` line now says `phase1 vht80` for builds with 80 MHz support, and a `WIDTH` line shows what the AP offers
+(`vhtcaps`, `vht80`, `centre`) and what the adapter allows (`nvm80`, `nvm40`).
