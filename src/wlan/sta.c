@@ -20,8 +20,9 @@ USHORT g_jfail;
 UCHAR  g_jreq[200], g_jres[160];
 USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
 UCHAR  g_jht, g_jht_mcs[2], g_jrates[12];
+UCHAR  g_j40, g_jsco, g_jnss = 1;
 USHORT g_jnrates;
-UCHAR  g_forcech, g_maxw, g_maxnss = 2;
+UCHAR  g_forcech, g_maxw = 2, g_maxnss = 2;      /* MAXWIDTH: 0 = 20, 1 or more = 40 MHz (80 is not implemented) */
 USHORT g_link_lost;
 net_t *g_jnet;
 USHORT g_rx_mgmt[16];
@@ -144,6 +145,13 @@ void sta_beacon(UCHAR FAR *f, USHORT len, USHORT chan, short rssi, ULONG rxtime)
    n->htc = (UCHAR)(e && e[1] >= 26);
    n->ht_mcs[0] = n->htc ? e[2 + 3] : 0;
    n->ht_mcs[1] = n->htc ? e[2 + 4] : 0;
+   n->ht40 = (UCHAR)(n->htc ? ((e[2] >> 1) & 1) : 0);
+   e = find_ie(body + 12, (USHORT)(blen - 12), 61);       /* HT operation                                    */
+   n->htw = n->sco = 0;
+   if (e && e[1] >= 22) {
+      n->sco = (UCHAR)(e[3] & 3);
+      n->htw = (UCHAR)((e[3] >> 2) & 1);
+   }
    n->wmm = (UCHAR)(find_wmm(body + 12, (USHORT)(blen - 12)) != 0);
    n->len = 0;
    e = find_ie(body + 12, (USHORT)(blen - 12), 0);
@@ -289,8 +297,10 @@ static int tx_assoc(net_t *n)
    if (g_jht) {                                        /* after the RSN element, as mac80211 orders them     */
       for (i = 0; i < 28; i++)
          g_frame[k++] = g_htcap[i];
-      if (g_hw_nss >= 2)
+      if (g_hw_nss >= 2 && g_maxnss >= 2)
          g_frame[k - 28 + 6] = 0xFF;                   /* rx MCS 8-15                                        */
+      if (g_j40)
+         g_frame[k - 28 + 2] |= 0x42;                  /* supports 40 MHz, short GI 40                       */
    }
    if (n->wmm)
       for (i = 0; i < 9; i++)
@@ -594,6 +604,11 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
    if (h && h[1] >= 2 && h[3] >= 1)
       g_jdtim = h[3];                                   /* TIM element: DTIM period                          */
    g_jht = n->htc;
+   g_j40 = g_jsco = 0;
+   if (g_jht && g_maxw >= 1 && n->ht40 && n->htw && (n->sco == 1 || n->sco == 3) && hw_chan_ht40(n->ch)) {
+      g_j40 = 1;                                        /* the AP runs a 40 MHz channel and may use it here: so do we */
+      g_jsco = n->sco;
+   }
    g_jaid = 0;
 
    if (hw_join_prepare(n)) { g_jfail = 9; abort_join(); return -1; }
@@ -622,6 +637,8 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
    if (h && h[1] < 26)
       h = 0;
    g_jht = (UCHAR)(h != 0);                              /* the AP confirmed HT in its response               */
+   if (!g_jht)
+      g_j40 = 0;
    g_jht_mcs[0] = h ? h[2 + 3] : 0;
    g_jht_mcs[1] = h ? h[2 + 4] : 0;
    g_jaid = g_assoc_aid;
@@ -657,6 +674,8 @@ void sta_leave(void)
       tx_deauth();
    g_joined = g_authorized = g_ptk_on = 0;
    g_jht = 0;
+   g_j40 = g_jsco = 0;
+   g_jnss = 1;
    abort_join();
    g_link_lost = 0;
 }

@@ -129,13 +129,20 @@ request 1.5 s later) is kept.
 `wlan/sta.c` runs the station side of the 802.11 state machine (mac80211's job on Linux); the firmware objects come
 from `iwl/iwl_mac.c` in the order iwm uses:
 
-1. **hw_join_prepare**: PHY context 0 to the AP's channel (20 MHz), MAC context (station type, BSSID, ACK rates from
+1. **hw_join_prepare**: PHY context 0 to the AP's channel (always 20 MHz while authenticating and associating), MAC context (station type, BSSID, ACK rates from
    the beacon's basic rates, default EDCA, beacons passed), binding (MAC 0 to PHY 0), station 0 (the AP) on queues
    5-8, a time event (up to 1000 TU) so that the firmware stays on the channel.
 2. **authentication** (open system) and **association request** (rates, RSN WPA2-PSK/CCMP, HT capabilities when the
-   AP has them: 20 MHz, short GI, MCS 0-15 on a 2x2 radio; WMM information when the AP has WMM) are sent as
+   AP has them: short GI, MCS 0-15 on a 2x2 radio, 40 MHz when used (below); WMM information when the AP has WMM) are sent as
    management frames on queue 5 at the lowest basic rate; the answers arrive as received frames.
-3. **hw_join_complete**: PHY context with two chains (HT, 2x2), station update (MIMO2 when the AP has two streams),
+3. **hw_join_complete**: PHY context with two chains (HT, 2x2) and, when 40 MHz is used, the wide channel;
+   40 MHz is used when MAXWIDTH allows it, the AP's beacon has the HT capabilities "40 MHz supported" bit and an HT
+   operation element with "STA channel width" set and a secondary channel above or below, the HT capabilities of the
+   association response confirm HT, and the NVM's regulatory data allows 40 MHz on the primary channel
+   (`hw_chan_ht40`). The PHY context then carries width 40 and the control channel position (secondary above: control
+   below, secondary below: control above), the station gets `FAT_EN_40MHZ`, and the first two rate-table entries carry
+   the 40 MHz flag, RTS protection and the AP's 40 MHz short-GI setting (later entries fall back to 20 MHz, as iwm
+   does), station update (MIMO2 when the AP has two streams),
    MAC context with the association data (AID, beacon interval, DTIM, TSF of the last beacon), smart FIFO on, multicast
    filter "pass all", power (constantly awake, keep-alive), time quota (all of it to binding 0), rate table, the time
    event removed.

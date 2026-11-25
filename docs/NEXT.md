@@ -10,7 +10,7 @@ In order of usefulness once the driver associates on hardware:
    table (LQ_CMD) with a lower starting rate, as iwm's AMRR/RA or Linux `mvm/rs.c` do.
 2. **A-MPDU receive.** Accept the AP's ADDBA request (ADD_STA with `add_immediate_ba_tid`, the response frame) and
    handle the firmware's reordering (or a host reorder buffer as iwm does): the largest throughput gain on 802.11n/ac.
-3. **40 and 80 MHz** (PROTOCOL.INI `MAXWIDTH` is parsed already): PHY context width/control position, HT/VHT
+3. **80 MHz** (40 MHz is done, `MAXWIDTH`): VHT
    capabilities in the association request, `STA_FLG_FAT_EN_*`, the rate flags.
 4. **QoS data frames** and the AP's WMM parameters in the MAC context (EDCA per access category).
 5. **ICT interrupt table** (fewer register reads per interrupt) and MSI, once the plain interrupt works.

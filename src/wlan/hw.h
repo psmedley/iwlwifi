@@ -40,6 +40,7 @@ void   hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), v
 
 /* ---- station operations ---------------------------------------------------------------------------- */
 int    hw_scan(void);                           /* blocking full scan; results through sta_beacon()          */
+int    hw_chan_ht40(UCHAR ch);                 /* 1 = 40 MHz is allowed on this primary channel (regulatory) */
 int    hw_join_prepare(struct net_s *n);        /* go to the AP's channel, firmware objects for the AP       */
 int    hw_join_complete(void);                  /* associated: AID, rates, HT from the sta state (g_j*)      */
 void   hw_leave(void);                          /* undo hw_join_prepare / hw_join_complete                   */

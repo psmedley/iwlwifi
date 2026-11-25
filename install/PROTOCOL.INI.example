@@ -26,3 +26,7 @@
    ; Optional: spatial streams to use, 1 or 2 (default 2: the adapter has two antennas). Set 1 if two-stream
    ; rates cause trouble with a particular access point.
    ; STREAMS = 1
+
+   ; Optional: widest channel to use, 20 or 40 (default 40: used when the access point and the regulatory data
+   ; allow it). 80 MHz is not implemented. Set 20 to compare.
+   ; MAXWIDTH = 20

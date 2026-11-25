@@ -18,6 +18,7 @@ typedef struct net_s {
    UCHAR  htc;                                  /* HT capabilities element present                           */
    UCHAR  wmm;                                  /* WMM parameter / information element present              */
    UCHAR  ht_mcs[2];                            /* the AP's rx MCS bitmap bytes 0, 1                         */
+   UCHAR  ht40, htw, sco;                       /* HT caps: 40 MHz capable; HT operation: STA channel width 40, secondary offset (1 above, 3 below) */
    UCHAR  basic[2];                             /* basic-rate bitmap: bit i = rate i of g_rate_tab           */
    USHORT ielen;                                /* bytes in ie[] (12 fixed beacon bytes + elements)          */
    UCHAR  ie[NET_IE_MAX];
@@ -35,6 +36,7 @@ extern USHORT g_jfail;                          /* reason of the last failed joi
 extern UCHAR  g_jreq[200], g_jres[160];
 extern USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
 extern UCHAR  g_jht;                            /* HT negotiated with this AP                                */
+extern UCHAR  g_j40, g_jsco, g_jnss;            /* 40 MHz in use, its secondary channel offset (1 above, 3 below), spatial streams */
 extern UCHAR  g_jht_mcs[2];                     /* the AP's HT rx MCS bytes from its association response     */
 extern UCHAR  g_jrates[12];                     /* the AP's legacy rates (association response), 802.11 units */
 extern USHORT g_jnrates;

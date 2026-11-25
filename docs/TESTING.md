@@ -80,6 +80,18 @@ received frames dropped (0 not from our AP, 1 null data, 2 A-MSDU, 3 protected b
 With the Wireless LAN Monitor or wpa_supplicant: `EAPOL=`/`EAPOLQ=` show the handshake frames, `LINK= ... PTK
 AUTHORIZED` the installed keys. `DECFAIL=` counts frames the firmware could not decrypt.
 
+## 5b. 5 GHz and 40 MHz
+
+The driver uses a 40 MHz channel when the access point runs one and the regulatory data allows it; `LINK=` shows
+`HT40 NSS=2 SCO=1` (secondary channel above) or `SCO=3` (below), `HT20` otherwise; the NDIS link speed follows
+(300 Mbit/s for two streams of 40 MHz). The last transmit's rate is in `TXST rate=` (flags: `00000800` 40 MHz,
+`00002000` short GI, `0000C000` two antennas, `00000100` HT, low byte the MCS: 0F is MCS 15).
+
+To compare, put `MAXWIDTH = 20` and `STREAMS = 1` in the `[IWLWIFI_NIF]` section of PROTOCOL.INI. To test 5 GHz
+(the driver picks the strongest access point of the SSID, which is usually the 2.4 GHz one), pin the primary
+channel with `CHANNEL = 149` (or 36, 40, 44, 48: channels 52-144 are DFS channels that the firmware may refuse to
+transmit on until it has checked for radar, so they are a poorer first test).
+
 ## 6. Interrupts
 
 `IRQS=` grows while the adapter is busy; `SPUR=` counts interrupts on a shared line that were not ours. `IRQS=0` with

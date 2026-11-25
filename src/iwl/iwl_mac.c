@@ -29,7 +29,7 @@ static ULONG  g_pn_lo;                          /* CCMP packet number (low 32 bi
 static ULONG  g_mgmt_rate;                      /* rate_n_flags of management frames (lowest basic rate)   */
 static UCHAR  g_basic_cck, g_basic_ofdm;        /* basic-rate bitmaps: CCK 1,2,5.5,11; OFDM 6..54           */
 static UCHAR  g_ap_rates_cck, g_ap_rates_ofdm;  /* every rate the AP supports                               */
-static UCHAR  g_ap_ht_sgi20;
+static UCHAR  g_ap_ht_sgi20, g_ap_ht_sgi40;
 static rx_phy_info_t g_phy;
 static USHORT g_phy_ok;
 
@@ -84,7 +84,10 @@ static void scan_rates(UCHAR FAR *ie, USHORT len, UCHAR hi)
             }
          }
       if (id == 45 && l >= 26)
+      {
          g_ap_ht_sgi20 = (UCHAR)((ie[pos + 2] & 0x20) != 0);
+         g_ap_ht_sgi40 = (UCHAR)((ie[pos + 2] & 0x40) != 0);
+      }
       pos = (USHORT)(pos + 2 + l);
    }
    /* the lowest basic rate sends management frames */
@@ -228,6 +231,8 @@ static int add_sta(USHORT update)
       c.station_flags_msk |= STA_FLG_MAX_AGG_SIZE_MSK | STA_FLG_AGG_MPDU_DENS_MSK;
       if (two_streams())
          c.station_flags |= STA_FLG_MIMO_EN_MIMO2;
+      if (g_j40)
+         c.station_flags |= STA_FLG_FAT_EN_40MHZ;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
    if (rc == 0 && (st & 0xFFUL) != ADD_STA_SUCCESS)
@@ -290,6 +295,23 @@ static int two_streams(void)
    return g_jht && g_hw_nss >= 2 && g_maxnss >= 2 && g_jht_mcs[1] != 0;
 }
 
+/* The first two attempts of an HT rate use the 40 MHz channel (with RTS protection) and the short guard interval
+ * the AP allows; later attempts fall back to 20 MHz, as iwm does. */
+static ULONG ht_wide(USHORT j)
+{
+   ULONG f = 0;
+
+   if (j >= 2)
+      return 0UL;
+   if (g_j40) {
+      f |= RATE_MCS_CHAN_WIDTH_40 | RATE_MCS_RTS_REQUIRED_MSK;
+      if (g_ap_ht_sgi40)
+         f |= RATE_MCS_SGI_MSK;
+   } else if (g_ap_ht_sgi20)
+      f |= RATE_MCS_SGI_MSK;
+   return f;
+}
+
 static int send_lq(void)
 {
    static lq_cmd_t c;
@@ -308,20 +330,16 @@ static int send_lq(void)
       if (two_streams()) {                         /* two streams first: MCS 15 .. 8, then the single-stream ones */
          for (m = 8; m-- > 0 && j < 16; )
             if (g_jht_mcs[1] & (1 << m)) {
-               ULONG f = (ULONG)(8 + m) | RATE_MCS_HT_MSK | RATE_MCS_ANT_AB_MSK;
+               ULONG f = (ULONG)(8 + m) | RATE_MCS_HT_MSK | RATE_MCS_ANT_AB_MSK | ht_wide(j);
 
-               if (g_ap_ht_sgi20 && j < 2)
-                  f |= RATE_MCS_SGI_MSK;
                c.rs_table[j++] = f;
             }
          c.mimo_delim = (UCHAR)j;                  /* the first single-stream index                           */
       }
       for (m = 8; m-- > 0 && j < 16; )
          if (g_jht_mcs[0] & (1 << m)) {
-            ULONG f = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK;
+            ULONG f = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK | ht_wide(j);
 
-            if (g_ap_ht_sgi20 && j < 2)             /* the first attempts may use the short guard interval    */
-               f |= RATE_MCS_SGI_MSK;
             c.rs_table[j++] = f;
          }
    } else {                                        /* the AP's legacy rates, fastest first                     */
@@ -377,7 +395,7 @@ int hw_join_prepare(net_t *n)
    if (!g_hw_ready)
       return -1;
    scan_rates((UCHAR FAR *)n->ie + 12, (USHORT)(n->ielen > 12 ? n->ielen - 12 : 0), hi);
-   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, n->ch, 1, 1))
+   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, n->ch, 1, 1, 0))
       return -2;
    if (mac_ctxt(FW_CTXT_ACTION_ADD, 0))
       return -3;
@@ -400,7 +418,8 @@ int hw_join_complete(void)
    UCHAR ch = (UCHAR)(two_streams() ? 2 : 1);
 
    scan_rates((UCHAR FAR *)g_jres, g_jreslen, (UCHAR)(g_jch > 14));
-   if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch))
+   g_jnss = (UCHAR)(two_streams() ? 2 : 1);
+   if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch, (UCHAR)(g_j40 ? g_jsco : 0)))
       return -1;
    if (add_sta(1))
       return -2;
@@ -440,7 +459,7 @@ void hw_leave(void)
       mac_ctxt(FW_CTXT_ACTION_REMOVE, 0);
       g_mac_on = 0;
    }
-   iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1);
+   iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0);
 }
 
 /* ---- keys -------------------------------------------------------------------------------------------------- */

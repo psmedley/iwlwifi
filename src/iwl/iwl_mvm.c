@@ -75,13 +75,15 @@ int iwl_send_sf(ULONG state, USHORT assoc)
 }
 
 /* ---- PHY context (one: id 0, color 0) ----------------------------------------------------------------- */
-int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd)
+int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd, UCHAR sco)
 {
    static phy_ctx_cmd_uhb_t u;
    static phy_ctx_cmd_t c;
    ULONG rx = ((ULONG)iwl_valid_rx_ant() << PHY_RX_CHAIN_VALID_POS) | ((ULONG)cs << PHY_RX_CHAIN_CNT_POS) |
               ((ULONG)cd << PHY_RX_CHAIN_MIMO_CNT_POS);
    UCHAR band = (UCHAR)(ch > 14 ? PHY_BAND_5 : PHY_BAND_24);
+   UCHAR width = (UCHAR)(sco ? PHY_VHT_CHANNEL_MODE40 : PHY_VHT_CHANNEL_MODE20);
+   UCHAR ctrl = (UCHAR)(sco == 3 ? PHY_VHT_CTRL_POS_1_ABOVE : PHY_VHT_CTRL_POS_1_BELOW);   /* secondary below = control above */
 
    if (FW_CAPA(CAPA_ULTRA_HB_CHANNELS)) {         /* the wider channel-info layout                          */
       fmemset((UCHAR FAR *)&u, 0, sizeof(u));
@@ -89,8 +91,8 @@ int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd)
       u.action = (ULONG)action;
       u.ci.channel = ch;
       u.ci.band = band;
-      u.ci.width = PHY_VHT_CHANNEL_MODE20;
-      u.ci.ctrl_pos = PHY_VHT_CTRL_POS_1_BELOW;
+      u.ci.width = width;
+      u.ci.ctrl_pos = ctrl;
       u.txchain_info = iwl_valid_tx_ant();
       u.rxchain_info = rx;
       return iwl_cmd1(CMD_PHY_CONTEXT, (UCHAR FAR *)&u, sizeof(u));
@@ -100,8 +102,8 @@ int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd)
    c.action = (ULONG)action;
    c.ci.band = band;
    c.ci.channel = ch;
-   c.ci.width = PHY_VHT_CHANNEL_MODE20;
-   c.ci.ctrl_pos = PHY_VHT_CTRL_POS_1_BELOW;
+   c.ci.width = width;
+   c.ci.ctrl_pos = ctrl;
    c.txchain_info = iwl_valid_tx_ant();
    c.rxchain_info = rx;
    return iwl_cmd1(CMD_PHY_CONTEXT, (UCHAR FAR *)&c, sizeof(c));
@@ -478,7 +480,7 @@ int hw_up(void)
    if (add_aux_sta())
       return fail("the auxiliary station could not be added", 0UL);
    step(0x25);
-   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1))
+   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0))
       return fail("PHY context add failed", 0UL);
    if (FW_CAPA(CAPA_CT_KILL_BY_FW)) {
       static temp_report_ths_cmd_t ths;            /* no thresholds (num_temps 0): the firmware handles CT-kill  */

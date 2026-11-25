@@ -18,6 +18,7 @@
 #define NVM_KEEP                 4096            /* bytes of a section kept (the regulatory LAR word is at 0xA0E) */
 
 UCHAR  g_nvm_chan[64];
+USHORT g_nvm_flags[64];                         /* NVM channel flags: 1 valid, 8 active, 200h 40 MHz, 400h 80 MHz */
 USHORT g_nvm_nchan;
 UCHAR  g_nvm_5ghz, g_nvm_11n, g_nvm_11ac, g_nvm_tx_ant, g_nvm_rx_ant, g_nvm_lar;
 USHORT g_nvm_version;
@@ -77,6 +78,18 @@ static int valid_mac(UCHAR FAR *m)
    return !z && !f && !(m[0] & 1) && !fmemeq(m, (UCHAR FAR *)reserved, 6);
 }
 
+int hw_chan_ht40(UCHAR ch)
+{
+   USHORT i;
+
+   if (!g_nvm_11n)
+      return 0;
+   for (i = 0; i < g_nvm_nchan; i++)
+      if (g_nvm_chan[i] == ch)
+         return (g_nvm_flags[i] & 0x0200) != 0;
+   return 0;
+}
+
 int iwl_nvm_init(void)
 {
    static UCHAR mac_ovr[6];
@@ -129,7 +142,10 @@ int iwl_nvm_init(void)
       if (i >= 14 && !g_nvm_5ghz)
          continue;
       if (g_nvm_nchan < sizeof(g_nvm_chan))
+      {
+         g_nvm_flags[g_nvm_nchan] = f;
          g_nvm_chan[g_nvm_nchan++] = g_chan8000[i];
+      }
    }
 
    /* MAC address: the override section when it holds a real address, else the OTP (WFMP registers) */

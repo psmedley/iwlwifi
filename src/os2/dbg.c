@@ -305,7 +305,7 @@ static void build_status(void)
    ps("DBG=");  ph(g_dbg_n, 4); ps(" ADDR="); ph(g_dbg_addr, 8); ps(" VAL="); ph(g_dbg_val, 8); nl();
    ps("LINK="); ps(g_joined ? "JOINED " : "none "); ph(g_jch, 2); ps(" AID="); ph(g_jaid, 4);
    ps(" JFAIL="); ph(g_jfail, 2); ps(g_open_net ? " OPEN" : " RSN"); ps(g_ptk_on ? " PTK" : " nokey");
-   ps(g_authorized ? " AUTHORIZED" : ""); ps(g_jht ? " HT" : " legacy"); nl();
+   ps(g_authorized ? " AUTHORIZED" : ""); ps(g_jht ? (g_j40 ? " HT40" : " HT20") : " legacy"); ps(" NSS="); ph(g_jnss, 1); ps(" SCO="); ph(g_jsco, 1); nl();
    ps("DATA rx="); ph(g_rx_data, 4); ps(" ndis="); ph(g_rx_ndis, 4); ps(" eapol="); ph(g_rx_eapol, 4);
    ps(" nobuf="); ph(g_rx_nobuf, 4); ps(" drop="); for (i = 0; i < 8; i++) { ph(g_rx_drop[i], 4); ps(i < 7 ? "," : ""); }
    ps(" tx="); ph(g_tx_data, 4); ps(" txbusy="); ph(g_tx_busy, 4); ps(" EAPOLQ="); ph(sta_eapol_count(), 2); nl();
