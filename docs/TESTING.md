@@ -241,3 +241,7 @@ If throughput drops or the link stalls with `POWERSAVE = 1`, send the status and
 **Run 13** (build 8ab895a, VHT80, rate adaptation with probe back-off; the status had no `POWER` line, so the power-save
 build was not the one running): download about 10 MB/s (11-12 at times), upload 9.8 MB/s. Probing is calmer on the download
 (`up=1 down=2`), still active during the long upload (`up=7 down=8`). The `DRIVER` line says `phase1 vht80 ps` for builds with power save.
+
+**Run 14** (build 88ba0bc, `POWERSAVE = 1`, VHT80): download 10.1 MB/s (up to 12 at times), upload 9.6 MB/s: the same as
+with power save off. `POWER save=1`, no firmware errors, aggregation and rate adaptation as before (upload settled at
+`rung=03/10 first=...F016`, two streams MCS 6).
