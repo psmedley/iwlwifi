@@ -32,3 +32,6 @@ Linux 5.4 `pcie/ctxt-info.c`, `pcie/rx.c`, `pcie/trans.c` as the reference:
 3. Stage 3, join (WPA2): station layer unchanged.
 4. Stage 4, speed: aggregation, VHT, rate adaptation, with the multi-queue receive path.
 Until stage 1 exists the device table lists the IDs as "not supported yet" and the driver ignores them.
+
+9560 identification (Linux 5.4+ on the author's machine, `8086:A370` subsystem `8086:4030`, rev 10): firmware 46.7e3e4b69.0
+(`iwlwifi-9000-pu-b0-jf-b0-46.ucode`), `crf-id 0x2816`, `cnv-id 0x1000100`, `wfpm id 0x80000000`.
