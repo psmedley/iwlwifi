@@ -16,7 +16,7 @@
 
 #define DRV_NAME        "IWLWIFI"
 #define DRV_VERSION     "0.0.1"
-#define DRV_BUILD       "phase1 vht80"
+#define DRV_BUILD       "phase1 vht80 ps"
 #define DRV_NIF         "IWLWIFI_NIF"           /* PROTOCOL.INI section, NDIS module name                     */
 #define DRV_NIF_LC      "iwlwifi_nif"           /* the same in lower case (PROTOCOL.INI parser)                */
 #define DRV_NIF_FILE    "IWLWIFI.NIF"

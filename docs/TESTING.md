@@ -237,3 +237,7 @@ faster rate now back off (3 s, doubling up to 30 s).
 management enabled, 100 ms awake time after any frame in either direction, no U-APSD). The status line `POWER save=`
 shows the setting. Expect: first ping after a pause a few ms slower (the beacon interval); bulk transfers unchanged.
 If throughput drops or the link stalls with `POWERSAVE = 1`, send the status and turn it off (the default).
+
+**Run 13** (build 8ab895a, VHT80, rate adaptation with probe back-off; the status had no `POWER` line, so the power-save
+build was not the one running): download about 10 MB/s (11-12 at times), upload 9.8 MB/s. Probing is calmer on the download
+(`up=1 down=2`), still active during the long upload (`up=7 down=8`). The `DRIVER` line says `phase1 vht80 ps` for builds with power save.
