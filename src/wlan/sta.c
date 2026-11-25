@@ -37,7 +37,7 @@ static USHORT g_want_open;
 static UCHAR  g_target[6];
 static USHORT g_joining, g_prepared, g_seq;
 static UCHAR  g_frame[300];
-static UCHAR  g_hdr[24];
+static UCHAR  g_hdr[26];
 
 
 static int mac_eq(UCHAR FAR *a, UCHAR FAR *b)
@@ -264,6 +264,7 @@ typedef struct {
    ULONG  stamp[BA_WIN];
 } ba_t;
 
+static void atx_tick(void);                             /* transmit aggregation, below                         */
 static ba_t   g_ba[BA_N];
 static DMA    g_ba_buf[BA_N];
 static UCHAR  g_ba_buf_ok[BA_N];
@@ -359,6 +360,8 @@ void sta_rx_tick(void)
 {
    USHORT i, k, idx;
    ULONG  now = 0;
+
+   atx_tick();
 
    for (i = 0; i < BA_N; i++) {
       ba_t *b = &g_ba[i];
@@ -481,6 +484,120 @@ static void ba_addba_request(UCHAR FAR *f, USHORT len)
    tx_addba_resp(f, 0, (USHORT)(0x0002 | (tid << 2) | (win << 6)));   /* immediate, no A-MSDU, our window     */
 }
 
+/* ---- transmit aggregation: the ADDBA request side (TID 0) -----------------------------------------------------
+ * After a few dozen QoS data frames (a bulk transfer, not a ping) one ADDBA request goes out; an accepting response
+ * hands TID 0 to the back end (hw_txagg_offer). A refusal or silence is retried much later. Built on the service
+ * path (sta_rx_tick), not in the transmit path. */
+#define ATX_IDLE   0
+#define ATX_WAIT   1                                    /* request sent, waiting for the response               */
+#define ATX_ON     2
+UCHAR  g_aggtx = 1;
+static UCHAR  g_atx, g_atx_pend, g_atx_tok;
+static USHORT g_atx_cnt;
+static ULONG  g_atx_t, g_atx_next;
+UCHAR  g_ampdu_par;                                     /* the AP's HT capabilities A-MPDU parameters byte      */
+USHORT g_atx_req, g_atx_ok, g_atx_refused, g_atx_timeout, g_atx_delba, g_tx_qos;
+
+static void atx_reset(void)
+{
+   g_atx = ATX_IDLE;
+   g_atx_pend = 0;
+   g_atx_cnt = 0;
+   g_atx_next = 0;
+}
+
+static void atx_backoff(ULONG ms)
+{
+   g_atx = ATX_IDLE;
+   g_atx_cnt = 0;
+   g_atx_next = dd_ms() + ms;
+   if (!g_atx_next)
+      g_atx_next = 1;
+}
+
+static void tx_addba_req(void)
+{
+   static UCHAR f[33];
+
+   rt_setmem((PVOID)f, 0, sizeof(f));
+   f[0] = 0xD0;
+   fmemcpy((UCHAR FAR *)f + 4, (UCHAR FAR *)g_target, 6);
+   fmemcpy((UCHAR FAR *)f + 10, (UCHAR FAR *)g_mymac, 6);
+   fmemcpy((UCHAR FAR *)f + 16, (UCHAR FAR *)g_target, 6);
+   seq_put((UCHAR FAR *)f);
+   f[24] = 3;                                          /* category: block ack                               */
+   f[25] = 0;                                          /* ADDBA request                                     */
+   g_atx_tok++;
+   if (!g_atx_tok)
+      g_atx_tok = 1;
+   f[26] = g_atx_tok;
+   put16((UCHAR FAR *)f + 27, (USHORT)(0x0002 | (0 << 2) | (64 << 6)));   /* immediate BA, TID 0, 64 buffers   */
+   put16((UCHAR FAR *)f + 31, (USHORT)(hw_qos_sn() << 4));                /* starting sequence number          */
+   g_atx = ATX_WAIT;
+   g_atx_t = dd_ms();
+   g_atx_req++;
+   hw_mgmt_tx((UCHAR FAR *)f, 33);
+}
+
+/* Service path, after every run. */
+static void atx_tick(void)
+{
+   ULONG now;
+
+   if (!g_joined || !g_jht || !g_aggtx) {
+      return;
+   }
+   if (g_atx == ATX_WAIT) {
+      if ((long)(dd_ms() - g_atx_t) > 1000L) {
+         g_atx_timeout++;
+         atx_backoff(10000UL);
+      }
+      return;
+   }
+   if (g_atx == ATX_IDLE && g_atx_pend) {
+      g_atx_pend = 0;
+      now = dd_ms();
+      if (g_atx_next && (long)(now - g_atx_next) < 0)
+         return;
+      if (hw_txagg_ok())
+         tx_addba_req();
+   }
+}
+
+static void atx_response(UCHAR FAR *f, USHORT len)   /* ADDBA response: token, status[2], params[2], timeout[2] */
+{
+   USHORT status, params;
+
+   if (len < 24 + 9 || g_atx != ATX_WAIT || f[26] != g_atx_tok)
+      return;
+   status = get16(f + 27);
+   params = get16(f + 29);
+   if (status != 0 || ((params >> 2) & 0x0F) != 0) {
+      g_atx_refused++;
+      atx_backoff(60000UL);
+      return;
+   }
+   g_atx = ATX_ON;
+   g_atx_ok++;
+   hw_txagg_offer(0, (USHORT)((params >> 6) & 0x03FF));
+}
+
+static void atx_delba(UCHAR FAR *f, USHORT len)
+{
+   USHORT params;
+
+   if (len < 24 + 6)
+      return;
+   params = get16(f + 26);
+   if ((params & 0x0800) || ((params >> 12) & 0x0F) != 0)   /* ours: initiator bit clear, TID 0                */
+      return;
+   if (g_atx == ATX_ON) {
+      hw_txagg_stop(0);
+      g_atx_delba++;
+      atx_backoff(10000UL);
+   }
+}
+
 static void ba_delba(UCHAR FAR *f, USHORT len)
 {
    USHORT params;
@@ -578,6 +695,10 @@ static void sta_mgmt_rx(UCHAR FAR *f, USHORT len)
          ba_addba_request(f, len);
       else if (f[24] == 3 && f[25] == 2)                 /* block ack: DELBA                                  */
          ba_delba(f, len);
+      if (f[24] == 3 && f[25] == 1)                      /* block ack: ADDBA response (to our request)        */
+         atx_response(f, len);
+      if (f[24] == 3 && f[25] == 2)
+         atx_delba(f, len);
    }
 }
 
@@ -779,7 +900,7 @@ static USHORT g_txlk;                                  /* NDIS TransmitChain may
 static int tx_eth(UCHAR FAR *eth, USHORT len, USHORT flags)
 {
    int    rc;
-   USHORT fl;
+   USHORT fl, hl;
 
    if (len < 14)
       return -1;
@@ -796,6 +917,15 @@ static int tx_eth(UCHAR FAR *eth, USHORT len, USHORT flags)
    fmemcpy((UCHAR FAR *)g_hdr + 10, eth + 6, 6);                    /* transmitter = source                 */
    fmemcpy((UCHAR FAR *)g_hdr + 16, eth, 6);                        /* destination                          */
    seq_put((UCHAR FAR *)g_hdr);
+   hl = 24;
+   if (g_aggtx && g_jht && !(flags & HWTX_EAPOL)) {   /* QoS data, TID 0 (best effort): the aggregation candidate */
+      g_hdr[0] = 0x88;
+      g_hdr[24] = g_hdr[25] = 0;
+      hl = 26;
+      g_tx_qos++;
+      if (g_atx == ATX_IDLE && !g_atx_pend && ++g_atx_cnt >= 24)
+         g_atx_pend = 1;
+   }
    {
       USHORT blen, n8023;
       UCHAR FAR *body = eth_to_llc(eth, len, &blen, &n8023);
@@ -806,7 +936,7 @@ static int tx_eth(UCHAR FAR *eth, USHORT len, USHORT flags)
          rt_irq_restore(fl);
          return -1;
       }
-      rc = hw_data_tx((UCHAR FAR *)g_hdr, 24, body, blen, flags);
+      rc = hw_data_tx((UCHAR FAR *)g_hdr, hl, body, blen, flags);
    }
    rt_lock_release(&g_txlk);
    rt_irq_restore(fl);
@@ -948,6 +1078,7 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
       g_j40 = 0;
    g_jht_mcs[0] = h ? h[2 + 3] : 0;
    g_jht_mcs[1] = h ? h[2 + 4] : 0;
+   g_ampdu_par = h ? h[2 + 2] : 0;
    g_jaid = g_assoc_aid;
    g_jcaps = g_assoc_caps;
    for (pos = 0; pos < 32; pos++)
@@ -982,6 +1113,7 @@ void sta_leave(void)
       tx_deauth();
    g_joined = g_authorized = g_ptk_on = 0;
    ba_reset_all();
+   atx_reset();
    g_jht = 0;
    g_j40 = g_jsco = 0;
    g_jnss = 1;

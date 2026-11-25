@@ -530,6 +530,11 @@ static void pi_line(char *l)
          g_ampdu = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "aggtx")) {         /* AGGTX = 0 | 1: transmit aggregation (default 1)       */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_aggtx = (UCHAR)(*v == '0' ? 0 : 1);
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "streams")) {       /* STREAMS = 1 | 2: spatial streams to use (default 2)  */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_maxnss = (UCHAR)(*v == '1' ? 1 : 2);

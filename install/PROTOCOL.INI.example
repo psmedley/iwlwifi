@@ -33,3 +33,5 @@
 
    ; Optional: receive aggregation (A-MPDU), 0 or 1 (default 1). Set 0 to compare, or if downloads stall.
    ; AMPDU = 0
+   ; Optional: transmit aggregation (A-MPDU), 0 or 1 (default 1). Set 0 to compare, or if uploads stall.
+   ; AGGTX = 0

@@ -233,6 +233,8 @@ static int add_sta(USHORT update)
          c.station_flags |= STA_FLG_MIMO_EN_MIMO2;
       if (g_j40)
          c.station_flags |= STA_FLG_FAT_EN_40MHZ;
+      c.station_flags |= (ULONG)(g_ampdu_par & 3) << STA_FLG_MAX_AGG_SIZE_SHIFT;
+      c.station_flags |= (ULONG)((g_ampdu_par >> 2) & 7) << STA_FLG_AGG_MPDU_DENS_SHIFT;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
    if (rc == 0 && (st & 0xFFUL) != ADD_STA_SUCCESS)
@@ -437,6 +439,7 @@ int hw_join_complete(void)
 
 void hw_leave(void)
 {
+   txa_reset();
    if (g_assoc_on) {
       iwl_send_sf(SF_INIT_OFF, 0);
       iwl_send_quota(0);
@@ -546,7 +549,6 @@ int hw_key_clear(USHORT pairwise, UCHAR idx)
 /* ---- transmit ---------------------------------------------------------------------------------------------- */
 /* hdr: the 802.11 header (24 bytes), body: what follows it. Layout of a slot: cmd header (4), tx command (56),
  * the 802.11 header; the payload (CCMP header + body) at offset 256. */
-static USHORT g_hwtxlk;                         /* the data queue: transmit (any context) and reclaim (service) */
 
 static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt);
 
@@ -567,25 +569,38 @@ static int tx_frame(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, U
 
 static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt)
 {
-   static USHORT idx;
+   static USHORT idx, qi;
    static ULONG  ph;
    UCHAR FAR *s;
    tx_cmd_t FAR *t;
-   USHORT pad, cmdlen, plen = 0, len;
+   USHORT pad, cmdlen, plen = 0, len, qos = 0, sn = 0;
    ULONG  fl;
    UCHAR  sub = (UCHAR)(hdr[0] & 0xF0);
+   int    rc;
 
    if ((USHORT)(blen + 8) > TX_SLOT_SZ - 256)
       return -3;
-   s = iwl_tx_slot(&idx, &ph);
+   qi = QI_BE;
+   if (!mgmt && hlen == 26 && (hdr[0] & 0x80)) {   /* QoS data (TID 0): a sequence number of our own          */
+      qos = 1;
+      rc = txa_pick(&qi);
+      if (rc)
+         return rc;
+   }
+   s = iwl_txq_slot(qi, &idx, &ph);
    if (!s)
       return -2;
+   if (qos) {
+      sn = txa_alloc_sn();
+      hdr[22] = (UCHAR)((hdr[22] & 0x0F) | (UCHAR)(sn << 4));
+      hdr[23] = (UCHAR)(sn >> 4);
+   }
    pad = (USHORT)((4 - (hlen & 3)) & 3);
    cmdlen = (USHORT)(4 + sizeof(tx_cmd_t) + hlen + pad);
    fmemset(s, 0, cmdlen);
    s[0] = CMD_TX;
    s[2] = (UCHAR)idx;
-   s[3] = (UCHAR)(FW_CAPA(CAPA_DQA_SUPPORT) ? DQA_MIN_MGMT_QUEUE : 0);
+   s[3] = (UCHAR)iwl_txq_qid(qi);
    t = (tx_cmd_t FAR *)(s + 4);
    fmemcpy(s + 4 + sizeof(tx_cmd_t), hdr, hlen);
    if (protect) {                                  /* CCMP header: PN 0..1, rsvd, key id 0 | ExtIV, PN 2..5  */
@@ -604,7 +619,9 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
    plen = (USHORT)(plen + blen);
    len = (USHORT)(hlen + plen);
    t->len = len;
-   fl = TX_CMD_FLG_ACK | TX_CMD_FLG_BT_DIS | TX_CMD_FLG_SEQ_CTL;
+   fl = TX_CMD_FLG_ACK | TX_CMD_FLG_BT_DIS;
+   if (!qos)
+      fl |= TX_CMD_FLG_SEQ_CTL;                    /* the firmware numbers the frame                         */
    if (pad) {
       fl |= TX_CMD_FLG_MH_PAD;
       t->offload_assist = TX_CMD_OFFLD_PAD;
@@ -621,10 +638,10 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
    } else {
       fl |= TX_CMD_FLG_STA_RATE;                   /* the rate table (LQ_CMD)                                */
       t->data_retry_limit = LOW_RETRY_LIMIT;
-      t->tid_tspec = TID_NON_QOS;
+      t->tid_tspec = qos ? 0 : TID_NON_QOS;
    }
    t->tx_flags = fl;
-   return iwl_tx_kick(idx, cmdlen, plen, (USHORT)(len + (protect ? 8 : 0)));
+   return iwl_txq_kick(qi, idx, cmdlen, plen, (USHORT)(len + (protect ? 8 : 0)), txa_bell_ok(qi));
 }
 
 int hw_mgmt_tx(UCHAR FAR *f, USHORT len)
@@ -656,6 +673,10 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
       g_tx_ok++;
    else
       g_tx_fail++;
+   if (iwl_txq_present(QI_AGG) && qid == iwl_txq_qid(QI_AGG)) {
+      txa_tx_resp(qid, p, len);
+      return;
+   }
    {
       USHORT fl = rt_irq_save();
 

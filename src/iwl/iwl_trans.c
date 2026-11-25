@@ -166,7 +166,7 @@ void   iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT 
 USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
 
 /* ---- DMA memory ------------------------------------------------------------------------------------ */
-#define NTXQ        6                           /* cmd, aux, 4 data (one per access category)            */
+#define NTXQ        7                           /* cmd, aux, 4 data (one per access category), TID 0 aggregation */
 #define CMD_SLOTS   32
 #define CMD_SLOT_SZ (4 + DEF_CMD_PAYLOAD_SIZE)  /* header + payload                                       */
 
@@ -177,6 +177,7 @@ typedef struct {
    DMA    buf;                                  /* slots (command queue, the BE data queue)              */
    USHORT nslot, slotsz;
    UCHAR  busy[TX_SLOTS];                       /* data queue: slot awaits its TX response               */
+   UCHAR  ok;                                   /* the ring exists (the aggregation queue is optional)    */
 } txq_t;
 
 static txq_t  g_txq[NTXQ];
@@ -215,6 +216,7 @@ int iwl_trans_alloc(void)
    g_txq[1].qid = g_auxq;
    for (i = 0; i < 4; i++)
       g_txq[2 + i].qid = (USHORT)(g_dataq + i);
+   g_txq[QI_AGG].qid = (USHORT)(dqa ? DQA_MIN_DATA_QUEUE : 0xFFFF);   /* transmit aggregation needs DQA firmware */
    if (g_alloc_done)
       return 0;
    if (dma_get_al(4096, 4096, &g_kw) ||
@@ -225,9 +227,11 @@ int iwl_trans_alloc(void)
        dma_get_al(4096, 16, &g_respbuf) ||
        dma_get_al(32768U, 16, &g_fwdma))
       return -1;
-   for (i = 0; i < NTXQ; i++)
+   for (i = 0; i < QI_AGG; i++) {
       if (dma_get_al(TFD_QUEUE_SIZE_MAX * TFD_SIZE, 256, &g_txq[i].tfd))
          return -2;
+      g_txq[i].ok = 1;
+   }
    g_txq[0].nslot = CMD_SLOTS;
    g_txq[0].slotsz = CMD_SLOT_SZ;
    if (dma_get_al(CMD_SLOTS * CMD_SLOT_SZ, 16, &g_txq[0].buf))
@@ -236,6 +240,14 @@ int iwl_trans_alloc(void)
    g_txq[2].slotsz = TX_SLOT_SZ;
    if (dma_get_al(TX_SLOTS * TX_SLOT_SZ, 64, &g_txq[2].buf))
       return -4;
+   if (dqa &&                                       /* the aggregation queue: a ring and its own slots; without memory the driver simply does not aggregate */
+       dma_get_al(TFD_QUEUE_SIZE_MAX * TFD_SIZE, 256, &g_txq[QI_AGG].tfd) == 0) {
+      if (dma_get_al(TX_SLOTS * TX_SLOT_SZ, 64, &g_txq[QI_AGG].buf) == 0) {
+         g_txq[QI_AGG].nslot = TX_SLOTS;
+         g_txq[QI_AGG].slotsz = TX_SLOT_SZ;
+         g_txq[QI_AGG].ok = 1;
+      }
+   }
    for (i = 0; i < RX_NBUF / 16; i++)
       if ((g_rxblk[i] = dma_big_al(0x10000UL, 4096)) == 0UL)
          return -5;
@@ -249,6 +261,8 @@ static void reset_rings(void)
    USHORT i;
 
    for (i = 0; i < NTXQ; i++) {
+      if (!g_txq[i].ok)
+         continue;
       fmemset(DPTR(g_txq[i].tfd), 0, TFD_QUEUE_SIZE_MAX * TFD_SIZE);
       g_txq[i].cur = g_txq[i].tail = g_txq[i].queued = 0;
       fmemset((UCHAR FAR *)g_txq[i].busy, 0, TX_SLOTS);
@@ -652,7 +666,7 @@ static int tx_init(void)
    for (i = 0; i < NTXQ; i++) {
       USHORT q = g_txq[i].qid;
 
-      if (q < 16)
+      if (g_txq[i].ok && q < 16)
          iwl_wr((USHORT)(FH_MEM_CBBC_0_15 + q * 4), g_txq[i].tfd.phys >> 8);
    }
    prph_wr_unlocked(SCD_GP_CTRL, prph_rd_unlocked(SCD_GP_CTRL) |
@@ -917,11 +931,16 @@ static void sched_update(USHORT qid, USHORT idx, UCHAR sta, USHORT len)
       put16(bc + (TFD_QUEUE_SIZE_MAX + idx) * 2, v);
 }
 
+static void bell(txq_t *q)                       /* tell the device where the ring ends now                */
+{
+   iwl_wr(HBUS_TARG_WRPTR, (ULONG)(q->qid << 8) | q->cur);
+}
+
 static void kick(txq_t *q)
 {
    q->queued++;
    q->cur = (USHORT)((q->cur + 1) & (TFD_QUEUE_SIZE_MAX - 1));
-   iwl_wr(HBUS_TARG_WRPTR, (ULONG)(q->qid << 8) | q->cur);
+   bell(q);
 }
 
 /* ---- host commands --------------------------------------------------------------------------------------- */
@@ -972,6 +991,7 @@ void iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT le
             g_async_fail++;
             clog(0x8018U, -13, get32(p));
          }
+         txa_cfg_answer(idx, (get32(p) & 0xFFUL) == ADD_STA_SUCCESS);   /* the one that completes an aggregation setup */
       } else if (flags & CMD_FAILED_MSK) {
          g_async_fail++;
          clog((USHORT)(0x8000U | code), -5, 0UL);
@@ -992,6 +1012,7 @@ void iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT le
    g_cmd_done = 1;
 }
 
+USHORT g_cmd_last_idx;
 static USHORT g_cmdlk;                          /* the command ring: the request path and the receive path both queue commands */
 USHORT g_async_ok, g_async_fail;
 
@@ -1025,6 +1046,7 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
       return -3;
    }
    idx = q->cur;
+   g_cmd_last_idx = idx;
    if (pay + hl <= CMD_SLOT_SZ) {
       USHORT s = (USHORT)(idx & (CMD_SLOTS - 1));
 
@@ -1125,14 +1147,14 @@ int iwl_cmd_status(USHORT id, UCHAR FAR *d, USHORT len, ULONG FAR *status)
 }
 
 /* ---- data transmit -------------------------------------------------------------------------------------- */
-/* A free slot on the BE data queue: the caller builds { cmd header, tx command, 802.11 header, pad } at the
- * start and the payload at offset 256, then calls iwl_tx_kick. */
-UCHAR FAR *iwl_tx_slot(USHORT *idx, ULONG *phys)
+/* A free slot on the data queue qi (QI_BE or QI_AGG): the caller builds { cmd header, tx command, 802.11 header,
+ * pad } at the start and the payload at offset 256, then calls iwl_txq_kick. */
+UCHAR FAR *iwl_txq_slot(USHORT qi, USHORT *idx, ULONG *phys)
 {
-   txq_t *q = &g_txq[2];
+   txq_t *q = &g_txq[qi];
    USHORT s;
 
-   if (!g_trans_on || q->queued >= TX_SLOTS - 1)
+   if (!g_trans_on || !q->ok || !q->nslot || q->queued >= TX_SLOTS - 1)
       return 0;
    s = (USHORT)(q->cur & (TX_SLOTS - 1));
    if (q->busy[s])
@@ -1143,10 +1165,11 @@ UCHAR FAR *iwl_tx_slot(USHORT *idx, ULONG *phys)
 }
 
 /* cmdlen: header + tx command + 802.11 header + pad (TB0 16 bytes, TB1 the rest), paylen at offset 256 (TB2);
- * totlen: the frame length the scheduler is told (header + payload + MIC). */
-int iwl_tx_kick(USHORT idx, USHORT cmdlen, USHORT paylen, USHORT totlen)
+ * totlen: the frame length the scheduler is told (header + payload + MIC). bell 0: only queue it (an aggregation
+ * queue whose firmware setup is not complete yet). */
+int iwl_txq_kick(USHORT qi, USHORT idx, USHORT cmdlen, USHORT paylen, USHORT totlen, USHORT dobell)
 {
-   txq_t *q = &g_txq[2];
+   txq_t *q = &g_txq[qi];
    USHORT s = (USHORT)(idx & (TX_SLOTS - 1));
    ULONG  ph = q->buf.phys + (ULONG)(s * TX_SLOT_SZ);
    static ULONG  a[3];
@@ -1158,9 +1181,54 @@ int iwl_tx_kick(USHORT idx, USHORT cmdlen, USHORT paylen, USHORT totlen)
    tfd_set(q, idx, (USHORT)(paylen ? 3 : 2), (ULONG FAR *)a, (USHORT FAR *)n);
    sched_update(q->qid, idx, STATION_ID, totlen);
    q->busy[s] = 1;
-   kick(q);
+   if (dobell)
+      kick(q);
+   else {
+      q->queued++;
+      q->cur = (USHORT)((q->cur + 1) & (TFD_QUEUE_SIZE_MAX - 1));
+   }
    return 0;
 }
+
+void iwl_txq_bell(USHORT qi)
+{
+   bell(&g_txq[qi]);
+}
+
+/* An aggregation queue starts at ring index idx: nothing is queued, the device is told where the ring starts. */
+void iwl_txq_reset(USHORT qi, USHORT idx)
+{
+   txq_t *q = &g_txq[qi];
+
+   fmemset((UCHAR FAR *)q->busy, 0, TX_SLOTS);
+   q->cur = q->tail = (USHORT)(idx & (TFD_QUEUE_SIZE_MAX - 1));
+   q->queued = 0;
+   iwl_wr(HBUS_TARG_WRPTR, (ULONG)(q->qid << 8) | q->cur);
+}
+
+/* Free the slots from the tail up to (not including) ring index idx; an index beyond what was queued is ignored. */
+void iwl_txq_reclaim_to(USHORT qi, USHORT idx)
+{
+   txq_t *q = &g_txq[qi];
+   USHORT n = (USHORT)((idx - q->tail) & (TFD_QUEUE_SIZE_MAX - 1));
+
+   if (n > q->queued)
+      return;
+   while (n--) {
+      USHORT s = (USHORT)(q->tail & (TX_SLOTS - 1));
+
+      if (q->busy[s]) {
+         q->busy[s] = 0;
+         q->queued--;
+      }
+      q->tail = (USHORT)((q->tail + 1) & (TFD_QUEUE_SIZE_MAX - 1));
+   }
+}
+
+USHORT iwl_txq_queued(USHORT qi)  { return g_txq[qi].queued; }
+USHORT iwl_txq_cur(USHORT qi)     { return g_txq[qi].cur; }
+USHORT iwl_txq_qid(USHORT qi)     { return g_txq[qi].qid; }
+int    iwl_txq_present(USHORT qi) { return g_txq[qi].ok && g_txq[qi].nslot; }
 
 /* The firmware's TX response for (qid, idx): free the slot. */
 void iwl_tx_reclaim(UCHAR qid, UCHAR idx)
@@ -1168,8 +1236,8 @@ void iwl_tx_reclaim(UCHAR qid, UCHAR idx)
    txq_t *q = txq_of(qid);
    USHORT s;
 
-   if (!q || !q->nslot || q == &g_txq[0])
-      return;
+   if (!q || !q->nslot || q == &g_txq[0] || q == &g_txq[QI_AGG])
+      return;                                     /* the aggregation queue is reclaimed by block-ack / ssn  */
    s = (USHORT)(idx & (TX_SLOTS - 1));
    if (q->busy[s]) {
       q->busy[s] = 0;
@@ -1179,10 +1247,6 @@ void iwl_tx_reclaim(UCHAR qid, UCHAR idx)
    q->tail = (USHORT)((idx + 1) & (TFD_QUEUE_SIZE_MAX - 1));
 }
 
-USHORT iwl_tx_queued(void)
-{
-   return g_txq[2].queued;
-}
 
 void iwl_trans_off(void)
 {

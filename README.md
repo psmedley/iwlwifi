@@ -38,7 +38,7 @@ NASM; no IBM DDK is needed.
 | WPA2-PSK: EAPOL queue to the supplicant, CCMP keys in the firmware (pairwise and group), CCMP header on transmit | `wlan/sta.c`, `iwl/iwl_mac.c` | written |
 | Data: Ethernet <-> 802.11 (LLC/SNAP), TX commands on the BE queue, RX MPDUs decrypted by the firmware | `wlan/sta.c`, `iwl/iwl_mac.c` | written |
 
-Not done (see [docs/NEXT.md](docs/NEXT.md)): 80 MHz (VHT) channels, transmit aggregation (receive aggregation is in:
+Not done (see [docs/NEXT.md](docs/NEXT.md)): 80 MHz (VHT) channels, transmit aggregation is in but unconfirmed on hardware (receive aggregation is in:
 the AP's block-ack requests are accepted), host-side rate adaptation (the firmware only walks the rate table on retries), power save,
 WPA3/TKIP/WEP, roaming. Other iwlwifi devices are listed in the device table but not driven yet: see
 [docs/ADDING-A-DEVICE.md](docs/ADDING-A-DEVICE.md).

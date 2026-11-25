@@ -226,6 +226,7 @@ extern char *g_devname;
 #define DQA_CMD_QUEUE           0
 #define DQA_AUX_QUEUE           1
 #define DQA_MIN_MGMT_QUEUE      5               /* + EDCA access category (BE 0, BK 1, VI 2, VO 3)        */
+#define DQA_MIN_DATA_QUEUE      10              /* + TID: the transmit aggregation queue of that TID      */
 #define LEGACY_CMD_QUEUE        9
 #define LEGACY_AUX_QUEUE        15
 #define TX_FIFO_BK              0
@@ -243,6 +244,8 @@ extern char *g_devname;
 
 #define TX_SLOTS                32              /* data frames in flight (a divisor of the 256-entry ring)   */
 #define TX_SLOT_SZ              1792U           /* command (<= 256 bytes) + CCMP header + 1514-byte frame      */
+#define QI_BE                   2               /* index in the driver's queue table: the BE data queue    */
+#define QI_AGG                  6               /* ... and the aggregation queue of TID 0                  */
 #define RX_RING_COUNT           256             /* hardware ring of receive buffer descriptors            */
 #define RX_NBUF                 64              /* buffers actually posted                                */
 #define RBUF_SIZE               4096
@@ -490,6 +493,8 @@ typedef struct {
 #define STA_FLG_MIMO_EN_MSK     0x30000000UL
 #define STA_FLG_MIMO_EN_MIMO2   0x10000000UL
 #define STA_FLG_FAT_EN_40MHZ    0x04000000UL
+#define STA_FLG_MAX_AGG_SIZE_SHIFT 19
+#define STA_FLG_AGG_MPDU_DENS_SHIFT 23
 #define STA_FLG_MAX_AGG_SIZE_64K 0x00180000UL   /* 3 << 19                                                */
 #define STA_MODIFY_ADD_BA_TID   0x08
 #define STA_MODIFY_REMOVE_BA_TID 0x10
@@ -795,11 +800,19 @@ extern UCHAR FAR *g_resp;                       /* payload of the last response 
 extern USHORT g_resp_len, g_resp_failed;
 
 /* data transmit (iwl_trans.c) */
-UCHAR FAR *iwl_tx_slot(USHORT *idx, ULONG *phys);   /* a free slot on the data queue, or NULL           */
-int    iwl_tx_kick(USHORT idx, USHORT cmdlen, USHORT paylen, USHORT totlen);
 
 void   iwl_tx_reclaim(UCHAR qid, UCHAR idx);
-USHORT iwl_tx_queued(void);
+/* data queues (QI_BE, QI_AGG): a free slot, put a frame in it (bell 1 = tell the device now), bookkeeping */
+UCHAR FAR *iwl_txq_slot(USHORT qi, USHORT *idx, ULONG *phys);
+int    iwl_txq_kick(USHORT qi, USHORT idx, USHORT cmdlen, USHORT paylen, USHORT totlen, USHORT bell);
+void   iwl_txq_bell(USHORT qi);
+void   iwl_txq_reset(USHORT qi, USHORT idx);     /* an aggregation queue starts at ring index idx            */
+void   iwl_txq_reclaim_to(USHORT qi, USHORT idx);   /* free the slots before ring index idx                   */
+USHORT iwl_txq_queued(USHORT qi);
+USHORT iwl_txq_cur(USHORT qi);
+USHORT iwl_txq_qid(USHORT qi);
+int    iwl_txq_present(USHORT qi);
+extern USHORT g_cmd_last_idx;                    /* ring index of the command queued last (asynchronous ones) */
 void   iwl_trans_off(void);
 USHORT iwl_rx_cur(void);
 extern USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
@@ -837,6 +850,17 @@ void   iwl_scan_done(void);
 extern USHORT g_scan_done, g_scan_n;
 
 /* iwl_mac.c: join, keys, data */
+/* iwl_agg.c: transmit aggregation (A-MPDU) */
+int    txa_pick(USHORT *qi);                    /* which queue the next QoS data frame uses (0 = ok, -2 = busy) */
+USHORT txa_alloc_sn(void);                      /* the next QoS sequence number (TID 0)                       */
+int    txa_bell_ok(USHORT qi);                  /* may the device be told about a frame put on queue qi?      */
+void   txa_cfg_answer(UCHAR idx, int ok);       /* the firmware answered the ADD_STA that completes the setup  */
+void   txa_ba_notif(UCHAR FAR *p, USHORT len);  /* BA_NOTIF: the firmware's block-ack window moved             */
+void   txa_tx_resp(UCHAR qid, UCHAR FAR *p, USHORT len);   /* TX_CMD answer of the aggregation queue          */
+void   txa_reset(void);                         /* link down                                                  */
+void   txa_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
+extern USHORT g_hwtxlk;                         /* the data queues: transmit (any context) and reclaim (service) */
+extern UCHAR  g_ampdu_par;                      /* the AP's HT capabilities A-MPDU parameters (association response) */
 void   iwl_rx_mpdu(UCHAR FAR *p, USHORT len);
 void   iwl_rx_phy(UCHAR FAR *p, USHORT len);
 void   iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);

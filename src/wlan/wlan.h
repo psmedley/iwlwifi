@@ -66,6 +66,8 @@ int    sta_tx(UCHAR FAR *eth, USHORT len);      /* NDIS data: 0 = queued, -1 = n
 int    sta_eapol_tx(UCHAR FAR *eth, USHORT len);
 USHORT sta_eapol_count(void);
 USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
+extern UCHAR  g_aggtx;                          /* PROTOCOL.INI AGGTX = 0 turns transmit aggregation off       */
+extern USHORT g_atx_req, g_atx_ok, g_atx_refused, g_atx_timeout, g_atx_delba, g_tx_qos;
 extern UCHAR  g_ampdu;                          /* PROTOCOL.INI AMPDU = 0 turns receive aggregation off        */
 extern USHORT g_ba_started, g_ba_refused, g_ba_stopped, g_ba_rel, g_ba_old, g_ba_dup, g_ba_to, g_ba_max, g_ba_direct;
 void   sta_rx_tick(void);                       /* the service path calls this after every run                 */

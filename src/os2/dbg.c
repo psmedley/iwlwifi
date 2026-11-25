@@ -318,6 +318,8 @@ static void build_status(void)
    ps("BA(rx aggregation) sessions="); ph(g_ba_started, 4); ps(" refused="); ph(g_ba_refused, 4); ps(" ended="); ph(g_ba_stopped, 4);
    ps(" direct="); ph(g_ba_direct, 4); ps(" reordered="); ph(g_ba_rel, 4); ps(" old="); ph(g_ba_old, 4);
    ps(" dup="); ph(g_ba_dup, 4); ps(" timeouts="); ph(g_ba_to, 4); ps(" maxheld="); ph(g_ba_max, 2); nl();
+   ps("TXBA(tx aggregation) qosframes="); ph(g_tx_qos, 4); ps(" addba="); ph(g_atx_req, 4); ps(" accepted="); ph(g_atx_ok, 4);
+   ps(" refused="); ph(g_atx_refused, 4); ps(" timeouts="); ph(g_atx_timeout, 4); ps(" delba="); ph(g_atx_delba, 4); nl();
    ps("LAT irq2hook max="); ph(g_lat_max, 4); ps("ms n="); ph(g_lat_n, 4); nl();
    hw_status(ps, ph, nl);                                  /* the back end's own lines                         */
    for (i = 0; i < g_nnet; i++) {

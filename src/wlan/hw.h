@@ -50,6 +50,11 @@ int    hw_mgmt_tx(UCHAR FAR *frame, USHORT len);   /* a complete management fram
  * path); the firmware's answer is only checked afterwards. 0 = queued. */
 int    hw_ba_start(UCHAR tid, USHORT ssn, USHORT win);
 int    hw_ba_stop(UCHAR tid);
+/* Transmit aggregation: the station sends the ADDBA request itself and tells the back end what the AP answered. */
+int    hw_txagg_ok(void);                       /* 1 = this firmware can aggregate transmit frames (DQA queues) */
+USHORT hw_qos_sn(void);                         /* the next QoS sequence number of TID 0 (start of the BA window) */
+void   hw_txagg_offer(UCHAR tid, USHORT win);   /* the AP accepted the ADDBA request: move TID 0 to an aggregation queue */
+void   hw_txagg_stop(UCHAR tid);                /* the session ended (DELBA, link lost): back to the ordinary queue */
 int    hw_key_set(UCHAR FAR *key, USHORT klen, USHORT pairwise, UCHAR idx);   /* CCMP key; 0 = installed */
 int    hw_key_clear(USHORT pairwise, UCHAR idx);
 

@@ -309,6 +309,9 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    case CMD_REPLY_RX_MPDU:
       iwl_rx_mpdu(p, len);
       break;
+   case CMD_BA_NOTIF:
+      txa_ba_notif(p, len);
+      break;
    case CMD_TX:
       iwl_tx_done(qid, idx, p, len);
       break;
@@ -602,7 +605,8 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    }
    ps("SCAN n="); ph(g_scan_n, 4); ps(" done="); ph(g_scan_done, 1); ps(" MPDU="); ph(g_rx_mpdu, 4);
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
-   ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_tx_queued(), 2); nl();
+   ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_txq_queued(QI_BE), 2); nl();
+   txa_status(ps, ph, nl);
    ps("ASYNC ok="); ph(g_async_ok, 4); ps(" fail="); ph(g_async_fail, 4); nl();
    ps("TXST last="); ph(g_tx_last_st, 4); ps(" retries="); ph(g_tx_last_fail, 2); ps(" rate="); ph(g_tx_last_rate, 8);
    ps(" hist(ok,direct,fail,other)="); for (i = 0; i < 4; i++) { ph(g_tx_st_hist[i], 4); ps(i < 3 ? "," : ""); } nl();

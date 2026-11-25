@@ -102,6 +102,21 @@ held at once. `ASYNC ok= fail=` counts the firmware's answers to the ADD_STA com
 should become non-zero and `reordered=` should grow; compare the speed with `AMPDU = 0` in PROTOCOL.INI. If a download
 stalls or TCP slows to a crawl, send me the BA line, `timeouts=` high means the AP's frames are not arriving.
 
+
+## 5d. Transmit aggregation
+
+After 24 QoS data frames the driver sends an ADDBA request (TID 0); if the AP accepts, TID 0 moves to its own firmware
+queue (queue 10) and the firmware builds A-MPDUs. `AGGTX = 0` in PROTOCOL.INI turns it off, to compare.
+
+* `TXBA(tx aggregation) qosframes= addba= accepted= refused= timeouts= delba=`: requests sent, AP answers.
+* `TXAGG state=` idle / offered / configuring / ACTIVE / FAILED, with the next sequence number, queue and ring position.
+* `TXAGG started= cfgok= cfgfail= cmdfail= scdbug= drain= giveup=`: `cfgok` should reach `started`; `scdbug` counts frames
+  that used the normal queue to avoid a scheduler restriction; `drain` counts waits for the normal queue to empty.
+* `TXAGG banotif= single= ampdus= frames=`: block-ack notifications, single-frame and aggregate completions.
+  `queued=` on the first TXAGG line must return to 0 when the upload ends (otherwise slots leak).
+
+Test: upload a large file (compare with `AGGTX = 0`). If the upload stalls, `state=` and `queued=` tell where.
+
 ## 6. Interrupts
 
 `IRQS=` grows while the adapter is busy; `SPUR=` counts interrupts on a shared line that were not ours. `IRQS=0` with

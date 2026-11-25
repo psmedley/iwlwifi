@@ -13,6 +13,7 @@ int dma_get(USHORT size, DMA *d) { d->p = calloc(1, size); return 0; }
 /* delivered frames: sn is carried in the payload */
 static int out[100000]; static int nout;
 static void rx_eth(UCHAR *eth, USHORT len) { out[nout++] = eth[14] | (eth[15] << 8); (void)len; }
+static void atx_tick(void) {}
 #include "block.inc"
 static int sn_of(int k) { return (4000 + k) & 0xFFF; }
 static void feed(int bi, int sn) { UCHAR f[64]; memset(f, 0, sizeof f); f[14] = sn & 0xFF; f[15] = sn >> 8; ba_input(bi, &g_ba[bi], sn, f, 40); }

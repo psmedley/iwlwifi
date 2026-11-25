@@ -8,8 +8,8 @@ In order of usefulness once the driver associates on hardware:
 1. **Rate adaptation.** Today the firmware starts every frame at the top of the rate table and walks down on retries.
    Track `TXOK`/`TXFAIL` per rate from the TX responses (`tx_resp_t.initial_rate`, `failure_frame`) and rebuild the
    table (LQ_CMD) with a lower starting rate, as iwm's AMRR/RA or Linux `mvm/rs.c` do.
-2. **A-MPDU receive: done** (host reorder buffer, `AMPDU=` in PROTOCOL.INI); **A-MPDU transmit** is next (ADDBA request
-   to the AP, aggregation queues, block-ack handling): uploads are still one MPDU at a time.
+2. **A-MPDU receive: done** (host reorder buffer, `AMPDU=` in PROTOCOL.INI). **A-MPDU transmit: written, awaiting
+   hardware results** (`AGGTX=`; TID 0 only, `src/iwl/iwl_agg.c`; see docs/TESTING.md 5d).
 3. **80 MHz** (40 MHz is done, `MAXWIDTH`): VHT
    capabilities in the association request, `STA_FLG_FAT_EN_*`, the rate flags.
 4. **QoS data frames** and the AP's WMM parameters in the MAC context (EDCA per access category).
