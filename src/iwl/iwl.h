@@ -866,6 +866,10 @@ void   txa_ba_notif(UCHAR FAR *p, USHORT len);  /* BA_NOTIF: the firmware's bloc
 void   txa_tx_resp(UCHAR qid, UCHAR FAR *p, USHORT len);   /* TX_CMD answer of the aggregation queue          */
 void   txa_reset(void);                         /* link down                                                  */
 void   txa_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
+void   rs_resp(UCHAR failed_attempts);           /* rate adaptation: transmit results and the periodic decision */
+void   rs_ba(UCHAR txed, UCHAR done);
+void   rs_tick(void);
+void   rs_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
 extern USHORT g_hwtxlk;                         /* the data queues: transmit (any context) and reclaim (service) */
 extern UCHAR  g_ampdu_par;                      /* the AP's HT capabilities A-MPDU parameters (association response) */
 void   iwl_rx_mpdu(UCHAR FAR *p, USHORT len);

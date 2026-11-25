@@ -501,6 +501,7 @@ static void ba_addba_request(UCHAR FAR *f, USHORT len)
 #define ATX_WAIT   1                                    /* request sent, waiting for the response               */
 #define ATX_ON     2
 UCHAR  g_aggtx = 1;
+UCHAR  g_rateadapt = 1;                                 /* PROTOCOL.INI RATEADAPT                               */
 static UCHAR  g_atx, g_atx_pend, g_atx_tok;
 static USHORT g_atx_cnt;
 static ULONG  g_atx_t, g_atx_next;

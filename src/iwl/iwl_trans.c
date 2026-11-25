@@ -480,6 +480,7 @@ void hw_service(void)
 void hw_hook(void)
 {
    hw_service();
+   rs_tick();
    if (g_irq_masked && g_trans_on) {
       g_irq_masked = 0;
       iwl_wr(CSR_INT_MASK, g_intmask);

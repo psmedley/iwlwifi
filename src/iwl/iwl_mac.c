@@ -303,14 +303,11 @@ static int two_streams(void)
    return g_jht && g_hw_nss >= 2 && g_maxnss >= 2 && g_jht_mcs[1] != 0;
 }
 
-/* The first two attempts of an HT rate use the 40 MHz channel (with RTS protection) and the short guard interval
- * the AP allows; later attempts fall back to 20 MHz, as iwm does. */
-static ULONG ht_wide(USHORT j)
+/* Every rate of the ladder runs on the link's whole channel width, with the short guard interval the AP allows. */
+static ULONG ht_flags(void)
 {
    ULONG f = 0;
 
-   if (j >= 2)
-      return 0UL;
    if (g_j40) {
       f |= RATE_MCS_CHAN_WIDTH_40 | RATE_MCS_RTS_REQUIRED_MSK;
       if (g_ap_ht_sgi40)
@@ -328,26 +325,84 @@ static int vht_max_mcs(USHORT nss)
    return v == 3 ? -1 : 7 + v;
 }
 
-/* As ht_wide: the first two attempts use 80 MHz (with RTS protection) and the short guard interval. */
-static ULONG vht_wide(USHORT j)
+static ULONG vht_flags(void)
 {
-   ULONG f = 0;
+   ULONG f = RATE_MCS_CHAN_WIDTH_80 | RATE_MCS_RTS_REQUIRED_MSK;
 
-   if (j >= 2)
-      return 0UL;
-   f = RATE_MCS_CHAN_WIDTH_80 | RATE_MCS_RTS_REQUIRED_MSK;
    if (g_jvsgi80)
       f |= RATE_MCS_SGI_MSK;
    return f;
 }
 
-static int send_lq(void)
+/* ---- rate ladder and adaptation ---------------------------------------------------------------------------
+ * The firmware has no rate scaling of its own for this device (iwm and Linux do it in the host): LQ_CMD holds a
+ * table of 16 rates that the firmware walks on retries, always starting at the first. The driver keeps a ladder of
+ * rates from fastest to slowest (two streams, then one) and sends the 16 entries starting at the "rung" it
+ * currently trusts. Every 200 ms the transmit results (acknowledged against failed attempts) move the rung: down
+ * when too much is lost, up (a probe, taken back when it does not hold) when everything went through. */
+#define LAD_MAX 20
+static ULONG  g_lad[LAD_MAX];
+static USHORT g_lad_n, g_lad_delim;               /* rungs; the first single-stream rung                         */
+static USHORT g_rs_cur, g_rs_good, g_rs_bad, g_rs_probe;
+static ULONG  g_rs_t, g_rs_block;
+USHORT g_rs_up, g_rs_down, g_rs_pct;
+
+static void ladder_build(void)
+{
+   USHORT m, k;
+   int    i, top;
+   UCHAR  hi = (UCHAR)(g_jch > 14);
+
+   g_lad_n = g_lad_delim = 0;
+   if (g_jht && g_j80) {                           /* VHT: two streams MCS 9..3, then one stream MCS 8..0       */
+      ULONG fl = vht_flags();
+
+      top = (g_hw_nss >= 2 && g_maxnss >= 2) ? vht_max_mcs(2) : -1;
+      for (k = 0; top >= 0 && k < 7 && top - (int)k >= 3; k++)
+         g_lad[g_lad_n++] = (ULONG)(top - (int)k) | ((ULONG)1 << RATE_VHT_MCS_NSS_POS) | RATE_MCS_VHT_MSK |
+                            RATE_MCS_ANT_AB_MSK | fl;
+      g_lad_delim = g_lad_n;
+      top = vht_max_mcs(1);
+      if (top > 8)
+         top = 8;
+      for (k = 0; top >= 0 && (int)k <= top && g_lad_n < LAD_MAX; k++)
+         g_lad[g_lad_n++] = (ULONG)(top - (int)k) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_A_MSK | fl;
+   } else if (g_jht) {
+      ULONG fl = ht_flags();
+
+      if (two_streams()) {                         /* two streams first: MCS 15 .. 8, then the single-stream ones */
+         for (m = 8; m-- > 0 && g_lad_n < LAD_MAX; )
+            if (g_jht_mcs[1] & (1 << m))
+               g_lad[g_lad_n++] = (ULONG)(8 + m) | RATE_MCS_HT_MSK | RATE_MCS_ANT_AB_MSK | fl;
+         g_lad_delim = g_lad_n;
+      }
+      for (m = 8; m-- > 0 && g_lad_n < LAD_MAX; )
+         if (g_jht_mcs[0] & (1 << m))
+            g_lad[g_lad_n++] = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK | fl;
+   } else {                                        /* the AP's legacy rates, fastest first                     */
+      for (i = 11; i >= 0 && g_lad_n < LAD_MAX; i--) {
+         if (i < 4 && (hi || !(g_ap_rates_cck & (1 << i))))
+            continue;
+         if (i >= 4 && !(g_ap_rates_ofdm & (1 << (i - 4))))
+            continue;
+         g_lad[g_lad_n++] = rate_code(i);
+      }
+   }
+}
+
+/* LQ_CMD for the ladder starting at rung r (async: from the service path). */
+static int lq_send(USHORT r, USHORT async)
 {
    static lq_cmd_t c;
-   USHORT j = 0, m;
+   USHORT k;
    int    i, lowest = -1;
    UCHAR  hi = (UCHAR)(g_jch > 14);
 
+   for (i = 0; i < 12; i++)                        /* the rest of the table: the lowest basic rate              */
+      if ((i < 4 && !hi && (g_basic_cck & (1 << i))) || (i >= 4 && (g_basic_ofdm & (1 << (i - 4))))) {
+         lowest = i;
+         break;
+      }
    fmemset((UCHAR FAR *)&c, 0, sizeof(c));
    c.sta_id = STATION_ID;
    c.single_stream_ant_msk = ANT_A;
@@ -355,59 +410,95 @@ static int send_lq(void)
    c.agg_time_limit = 4000;
    c.agg_disable_start_th = 3;
    c.agg_frame_cnt_limit = 0x3F;
-   if (g_jht && g_j80) {                           /* VHT: up to 8 two-stream rates, then single-stream ones     */
-      int top, k;
-
-      top = (g_hw_nss >= 2 && g_maxnss >= 2) ? vht_max_mcs(2) : -1;
-      for (k = 0; top >= 0 && k < 8 && top - k >= 0; k++)
-      {
-         ULONG f = (ULONG)(top - k) | ((ULONG)1 << RATE_VHT_MCS_NSS_POS) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_AB_MSK | vht_wide(j);
-
-         c.rs_table[j++] = f;
-      }
-      c.mimo_delim = (UCHAR)j;
-      top = vht_max_mcs(1);
-      if (top > 8 && j >= 2)
-         top = 8;                                  /* later attempts use 20 MHz, where MCS 9 does not exist for 1-2 streams: the firmware asserts */
-      for (k = 0; top >= 0 && k < 8 && top - k >= 0 && j < 16; k++)
-      {
-         ULONG f = (ULONG)(top - k) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_A_MSK | vht_wide(j);
-
-         c.rs_table[j++] = f;
-      }
-   } else if (g_jht) {
-      if (two_streams()) {                         /* two streams first: MCS 15 .. 8, then the single-stream ones */
-         for (m = 8; m-- > 0 && j < 16; )
-            if (g_jht_mcs[1] & (1 << m)) {
-               ULONG f = (ULONG)(8 + m) | RATE_MCS_HT_MSK | RATE_MCS_ANT_AB_MSK | ht_wide(j);
-
-               c.rs_table[j++] = f;
-            }
-         c.mimo_delim = (UCHAR)j;                  /* the first single-stream index                           */
-      }
-      for (m = 8; m-- > 0 && j < 16; )
-         if (g_jht_mcs[0] & (1 << m)) {
-            ULONG f = (ULONG)m | RATE_MCS_HT_MSK | RATE_MCS_ANT_A_MSK | ht_wide(j);
-
-            c.rs_table[j++] = f;
-         }
-   } else {                                        /* the AP's legacy rates, fastest first                     */
-      for (i = 11; i >= 0 && j < 16; i--) {
-         if (i < 4 && (hi || !(g_ap_rates_cck & (1 << i))))
-            continue;
-         if (i >= 4 && !(g_ap_rates_ofdm & (1 << (i - 4))))
-            continue;
-         c.rs_table[j++] = rate_code(i);
-      }
-   }
-   for (i = 0; i < 12; i++)                        /* the rest: the lowest basic rate                           */
-      if ((i < 4 && !hi && (g_basic_cck & (1 << i))) || (i >= 4 && (g_basic_ofdm & (1 << (i - 4))))) {
-         lowest = i;
-         break;
-      }
-   while (j < 16)
-      c.rs_table[j++] = lowest >= 0 ? rate_code(lowest) : g_mgmt_rate;
+   for (k = 0; k < 16; k++)
+      c.rs_table[k] = (USHORT)(r + k) < g_lad_n ? g_lad[r + k] : (lowest >= 0 ? rate_code(lowest) : g_mgmt_rate);
+   c.mimo_delim = (UCHAR)(g_lad_delim > r ? g_lad_delim - r : 0);
+   if (async)
+      return iwl_cmd_async(CMD_LQ, (UCHAR FAR *)&c, sizeof(c));
    return iwl_cmd1(CMD_LQ, (UCHAR FAR *)&c, sizeof(c));
+}
+
+static int send_lq(void)
+{
+   ladder_build();
+   g_rs_cur = g_rs_good = g_rs_bad = g_rs_probe = 0;
+   g_rs_block = 0;
+   g_rs_t = dd_ms();
+   return lq_send(0, 0);
+}
+
+static ULONG mul100(USHORT g)
+{
+   ULONG a = g, a4 = a + a, a8, a16, a32, a64;
+
+   a4 += a4;
+   a8 = a4 + a4;
+   a16 = a8 + a8;
+   a32 = a16 + a16;
+   a64 = a32 + a32;
+   return a64 + a32 + a4;
+}
+
+void rs_resp(UCHAR failed_attempts)               /* a transmit response: one success, failed_attempts losses  */
+{
+   if (g_rs_good < 0xFF00)
+      g_rs_good++;
+   if (g_rs_bad < 0xFF00)
+      g_rs_bad = (USHORT)(g_rs_bad + failed_attempts);
+}
+
+void rs_ba(UCHAR txed, UCHAR done)                /* a block ack: done of txed subframes arrived                */
+{
+   if (done > txed)
+      done = txed;
+   g_rs_good = (USHORT)(g_rs_good + done);
+   g_rs_bad = (USHORT)(g_rs_bad + (txed - done));
+}
+
+void rs_tick(void)                                /* service path, after every run                              */
+{
+   ULONG  now;
+   USHORT tot, pct, last, old;
+
+   if (!g_rateadapt || !g_assoc_on || g_lad_n < 2)
+      return;
+   now = dd_ms();
+   if ((long)(now - g_rs_t) < 200L)
+      return;
+   tot = (USHORT)(g_rs_good + g_rs_bad);
+   if (tot < 24)                                   /* too little to judge: keep counting                          */
+      return;
+   g_rs_t = now;
+   pct = (USHORT)u32_div(mul100(g_rs_good), (ULONG)tot);
+   g_rs_pct = pct;
+   g_rs_good = g_rs_bad = 0;
+   last = (USHORT)(g_lad_n - 1);
+   old = g_rs_cur;
+   if (pct < 55 && g_rs_cur < last) {              /* too much lost: a slower rate                                 */
+      g_rs_cur = (USHORT)(g_rs_cur + ((pct < 30 && g_rs_cur + 1 < last) ? 2 : 1));
+      g_rs_block = now + 3000UL;
+      g_rs_probe = 0;
+      g_rs_down++;
+   } else if (g_rs_probe && pct < 75) {            /* the probe of a faster rate did not hold                      */
+      g_rs_cur++;
+      g_rs_block = now + 5000UL;
+      g_rs_probe = 0;
+      g_rs_down++;
+   } else if (pct >= 92 && g_rs_cur > 0 && (long)(now - g_rs_block) >= 0L) {
+      g_rs_cur--;                                  /* all went through: try a faster one                           */
+      g_rs_probe = 1;
+      g_rs_up++;
+   } else if (pct >= 75)
+      g_rs_probe = 0;
+   if (g_rs_cur != old)
+      lq_send(g_rs_cur, 1);
+}
+
+void rs_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
+{
+   ps("RATE adapt="); ph(g_rateadapt, 1); ps(" rung="); ph(g_rs_cur, 2); ps("/"); ph(g_lad_n, 2);
+   ps(" first="); ph(g_lad[g_rs_cur < LAD_MAX ? g_rs_cur : 0], 8); ps(" up="); ph(g_rs_up, 4); ps(" down="); ph(g_rs_down, 4);
+   ps(" lastok%="); ph(g_rs_pct, 3); nl();
 }
 
 static int send_mac_power(void)
@@ -730,6 +821,8 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
 
    if (len < sizeof(tx_resp_t))
       return;
+   if (p[2] == 0)
+      rs_resp(p[3]);                               /* failure_rts == 0: data statistics for the rate ladder   */
    if (p[0] > 1 && iwl_txq_present(QI_AGG) && qid == iwl_txq_qid(QI_AGG)) {
       txa_tx_resp(qid, p, len);                    /* an A-MPDU: the status field is not a frame's result    */
       return;

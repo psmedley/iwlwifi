@@ -211,3 +211,16 @@ The `DRIVER` line now says `phase1 vht80` for builds with 80 MHz support, and a 
 every join failed (`JFAIL=09`, all commands `FFF9`). `04004009` is a rate word: VHT, antenna A, MCS 9. The rate table
 sent after the 80 MHz join contained a one-stream MCS 9 entry for the later retries, which run at 20 MHz, where VHT
 MCS 9 does not exist for one or two streams. Fixed: those entries are capped at MCS 8.
+
+**Run 11** (build 4c2e893, 5 GHz channel 149, VHT80, `rate=4400F019` = VHT, 80 MHz, two streams, MCS 9, short GI): joined and
+stable, no firmware errors. Download 8.6 MB/s, upload 6.9 MB/s: slower than HT40 (10.5 and 10.7 MB/s) because every
+frame started at MCS 9 and fell down the table on retries (`retries=02`), the firmware having no rate scaling for this
+device. Hence the rate ladder below.
+
+## 5f. Rate adaptation
+
+The driver keeps a ladder of rates (two streams then one, fastest first) and sends the firmware a 16-entry table starting
+at the current rung; every 200 ms the transmit results move the rung (`RATE` status line): `rung=` current/total,
+`first=` the rate word at that rung, `up=`/`down=` moves, `lastok%=` share of attempts that succeeded. `RATEADAPT = 0` in
+PROTOCOL.INI keeps the first rung. Expect the rung to settle a few steps down on a weak link; with VHT80 and a good
+link, `first=` should show MCS 7-9 for two streams (rate word ends in 17, 18 or 19 with bit 4 set).

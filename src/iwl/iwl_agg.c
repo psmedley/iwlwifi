@@ -261,6 +261,7 @@ void txa_ba_notif(UCHAR FAR *p, USHORT len)
       g_txa_bad_notif++;
       return;
    }
+   rs_ba(p[24], p[25]);
    if (enter(&fl))
       return;
    if (g_txa_state == TXA_ACTIVE) {
