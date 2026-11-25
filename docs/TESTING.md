@@ -190,3 +190,7 @@ time spent in the service hook (`busy total=`, `worst-second=` ms per second; ne
 Compare `hooks=` with `irqs=` and with the received frame count: about one hook per frame means per-frame overhead.
 Changes made for this: no hook re-arm for frames queued while the hook is already running, and one NDIS
 IndicationComplete per batch of received frames instead of one per frame.
+
+**Run 8** (build b38af5b, 5 GHz channel 149, HT40, two streams, `rate=4000E90F` = 300 Mbit/s): download with wget
+10.5-11 MB/s, upload over SMB 10.7 MB/s (2.4 GHz HT20 gave 6.6 MB/s both ways; uploads were 3.3 MB/s without TX
+aggregation). Both aggregation sessions up, no timeouts, no failures; `queued=` back to 0 when idle.
