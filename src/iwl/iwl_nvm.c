@@ -78,6 +78,18 @@ static int valid_mac(UCHAR FAR *m)
    return !z && !f && !(m[0] & 1) && !fmemeq(m, (UCHAR FAR *)reserved, 6);
 }
 
+int hw_chan_vht80(UCHAR ch)
+{
+   USHORT i;
+
+   if (!g_nvm_11n || !g_nvm_11ac)
+      return 0;
+   for (i = 0; i < g_nvm_nchan; i++)
+      if (g_nvm_chan[i] == ch)
+         return (g_nvm_flags[i] & 0x0400) != 0;
+   return 0;
+}
+
 int hw_chan_ht40(UCHAR ch)
 {
    USHORT i;

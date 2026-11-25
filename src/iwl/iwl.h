@@ -493,6 +493,7 @@ typedef struct {
 #define STA_FLG_MIMO_EN_MSK     0x30000000UL
 #define STA_FLG_MIMO_EN_MIMO2   0x10000000UL
 #define STA_FLG_FAT_EN_40MHZ    0x04000000UL
+#define STA_FLG_FAT_EN_80MHZ    0x08000000UL
 #define STA_FLG_MAX_AGG_SIZE_SHIFT 19
 #define STA_FLG_AGG_MPDU_DENS_SHIFT 23
 #define STA_FLG_MAX_AGG_SIZE_64K 0x00180000UL   /* 3 << 19                                                */
@@ -536,8 +537,11 @@ typedef struct {
 #define PHY_BAND_24             1
 #define PHY_VHT_CHANNEL_MODE20  0
 #define PHY_VHT_CHANNEL_MODE40  1
+#define PHY_VHT_CHANNEL_MODE80  2
 #define PHY_VHT_CTRL_POS_1_ABOVE 4
 #define PHY_VHT_CTRL_POS_1_BELOW 0
+#define PHY_VHT_CTRL_POS_2_BELOW 1
+#define PHY_VHT_CTRL_POS_2_ABOVE 5
 #define PHY_RX_CHAIN_DRIVER_FORCE_POS 0
 #define PHY_RX_CHAIN_VALID_POS  1
 #define PHY_RX_CHAIN_FORCE_SEL_POS 4
@@ -744,6 +748,9 @@ typedef struct { ULONG error_type; UCHAR cmd_id, reserved1; USHORT bad_cmd_seq_n
 #define RATE_MCS_CCK_MSK        0x00000200UL
 #define RATE_MCS_SGI_MSK        0x00002000UL
 #define RATE_MCS_CHAN_WIDTH_40  0x00000800UL
+#define RATE_MCS_CHAN_WIDTH_80  0x00001000UL
+#define RATE_MCS_VHT_MSK        0x04000000UL
+#define RATE_VHT_MCS_NSS_POS    4
 #define RATE_MCS_RTS_REQUIRED_MSK 0x40000000UL
 #define RATE_MCS_ANT_A_MSK      0x00004000UL
 #define RATE_MCS_ANT_B_MSK      0x00008000UL
@@ -825,7 +832,7 @@ void   iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);
 extern USHORT g_init_complete, g_calib_complete;
 UCHAR  iwl_valid_tx_ant(void);
 UCHAR  iwl_valid_rx_ant(void);
-int    iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR chains_static, UCHAR chains_dynamic, UCHAR sco);   /* sco: 0 = 20 MHz, 1 / 3 = 40 MHz with the secondary channel above / below */
+int    iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR chains_static, UCHAR chains_dynamic, UCHAR width, UCHAR ctrl);   /* width: PHY_VHT_CHANNEL_MODE*, ctrl: position of the primary channel in it */
 int    iwl_send_sf(ULONG state, USHORT assoc);
 int    iwl_send_power(void);
 int    iwl_send_quota(USHORT running);

@@ -77,15 +77,13 @@ int iwl_send_sf(ULONG state, USHORT assoc)
 }
 
 /* ---- PHY context (one: id 0, color 0) ----------------------------------------------------------------- */
-int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd, UCHAR sco)
+int iwl_send_phy_ctxt(USHORT action, UCHAR ch, UCHAR cs, UCHAR cd, UCHAR width, UCHAR ctrl)
 {
    static phy_ctx_cmd_uhb_t u;
    static phy_ctx_cmd_t c;
    ULONG rx = ((ULONG)iwl_valid_rx_ant() << PHY_RX_CHAIN_VALID_POS) | ((ULONG)cs << PHY_RX_CHAIN_CNT_POS) |
               ((ULONG)cd << PHY_RX_CHAIN_MIMO_CNT_POS);
    UCHAR band = (UCHAR)(ch > 14 ? PHY_BAND_5 : PHY_BAND_24);
-   UCHAR width = (UCHAR)(sco ? PHY_VHT_CHANNEL_MODE40 : PHY_VHT_CHANNEL_MODE20);
-   UCHAR ctrl = (UCHAR)(sco == 3 ? PHY_VHT_CTRL_POS_1_ABOVE : PHY_VHT_CTRL_POS_1_BELOW);   /* secondary below = control above */
 
    if (FW_CAPA(CAPA_ULTRA_HB_CHANNELS)) {         /* the wider channel-info layout                          */
       fmemset((UCHAR FAR *)&u, 0, sizeof(u));
@@ -491,7 +489,7 @@ int hw_up(void)
    if (add_aux_sta())
       return fail("the auxiliary station could not be added", 0UL);
    step(0x25);
-   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0))
+   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
       return fail("PHY context add failed", 0UL);
    if (FW_CAPA(CAPA_CT_KILL_BY_FW)) {
       static temp_report_ths_cmd_t ths;            /* no thresholds (num_temps 0): the firmware handles CT-kill  */

@@ -10,7 +10,7 @@ In order of usefulness once the driver associates on hardware:
    table (LQ_CMD) with a lower starting rate, as iwm's AMRR/RA or Linux `mvm/rs.c` do.
 2. **A-MPDU receive: done** (host reorder buffer, `AMPDU=` in PROTOCOL.INI). **A-MPDU transmit: written, awaiting
    hardware results** (`AGGTX=`; TID 0 only, `src/iwl/iwl_agg.c`; see docs/TESTING.md 5d).
-3. **80 MHz** (40 MHz is done, `MAXWIDTH`): VHT
+3. **80 MHz: written, awaiting hardware results** (`MAXWIDTH=40` turns it off): VHT
    capabilities in the association request, `STA_FLG_FAT_EN_*`, the rate flags.
 4. **QoS data frames** and the AP's WMM parameters in the MAC context (EDCA per access category).
 5. **ICT interrupt table** (fewer register reads per interrupt) and MSI, once the plain interrupt works.

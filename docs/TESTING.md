@@ -194,3 +194,10 @@ IndicationComplete per batch of received frames instead of one per frame.
 **Run 8** (build b38af5b, 5 GHz channel 149, HT40, two streams, `rate=4000E90F` = 300 Mbit/s): download with wget
 10.5-11 MB/s, upload over SMB 10.7 MB/s (2.4 GHz HT20 gave 6.6 MB/s both ways; uploads were 3.3 MB/s without TX
 aggregation). Both aggregation sessions up, no timeouts, no failures; `queued=` back to 0 when idle.
+
+## 5e. 80 MHz (VHT)
+
+On a 5 GHz AP that advertises VHT with an 80 MHz operating width (and when the NVM allows 80 MHz on its channel) the
+link line reads `HT... VHT80 NSS=2`, the last transmit rate (`TXST rate=`) has bit 26 set (VHT, e.g. `0400....`) and
+the width bits 1000h (80 MHz). `MAXWIDTH = 40` (or 20) in PROTOCOL.INI restores the earlier behaviour. If the join
+fails or the link stalls with VHT80, send the status and say which AP; try `MAXWIDTH = 40` to compare.

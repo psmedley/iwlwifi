@@ -294,7 +294,7 @@ static void oid_request(int is_set, ULONG oid, UCHAR FAR *dat, USHORT dlen)
       if (oid == OID_GEN_MEDIA_SUPPORTED || oid == OID_GEN_MEDIA_IN_USE) { val = 0UL; goto put4; }
       if (oid == OID_GEN_MAXIMUM_FRAME_SIZE)   { val = 1500UL; goto put4; }
       if (oid == OID_GEN_LINK_SPEED) {                 /* the best HT rate with short GI: 72.2 / 150 Mbit/s per stream */
-         val = g_jht ? (g_j40 ? 1500000UL : 722000UL) : 540000UL;
+         val = g_jht ? (g_j80 ? 4333000UL : (g_j40 ? 1500000UL : 722000UL)) : 540000UL;
          if (g_jht && g_jnss >= 2)
             val += val;
          goto put4;

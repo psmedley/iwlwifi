@@ -21,8 +21,9 @@ UCHAR  g_jreq[200], g_jres[160];
 USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
 UCHAR  g_jht, g_jht_mcs[2], g_jrates[12];
 UCHAR  g_j40, g_jsco, g_jnss = 1;
+UCHAR  g_j80, g_jcf0, g_jvrx[2], g_jvsgi80, g_jvexp;
 USHORT g_jnrates;
-UCHAR  g_forcech, g_maxw = 2, g_maxnss = 2;      /* MAXWIDTH: 0 = 20, 1 or more = 40 MHz (80 is not implemented) */
+UCHAR  g_forcech, g_maxw = 2, g_maxnss = 2;      /* MAXWIDTH: 0 = 20, 1 = 40, 2 = 80 MHz (VHT)                  */
 USHORT g_link_lost;
 net_t *g_jnet;
 USHORT g_rx_mgmt[16];
@@ -152,6 +153,14 @@ void sta_beacon(UCHAR FAR *f, USHORT len, USHORT chan, short rssi, ULONG rxtime)
    if (e && e[1] >= 22) {
       n->sco = (UCHAR)(e[3] & 3);
       n->htw = (UCHAR)((e[3] >> 2) & 1);
+   }
+   e = find_ie(body + 12, (USHORT)(blen - 12), 191);      /* VHT capabilities                                */
+   n->vht = (UCHAR)(e && e[1] >= 12);
+   n->vhtw = n->vcf0 = 0;
+   e = find_ie(body + 12, (USHORT)(blen - 12), 192);      /* VHT operation: width 1 = 80 MHz, centre channel */
+   if (n->vht && e && e[1] >= 5 && e[2] == 1) {
+      n->vhtw = 1;
+      n->vcf0 = e[3];
    }
    n->wmm = (UCHAR)(find_wmm(body + 12, (USHORT)(blen - 12)) != 0);
    n->len = 0;
@@ -652,6 +661,16 @@ static int tx_assoc(net_t *n)
       if (g_j40)
          g_frame[k - 28 + 2] |= 0x42;                  /* supports 40 MHz, short GI 40                       */
    }
+   if (g_j80) {                                        /* VHT capabilities: 80 MHz, short GI 80, A-MPDU 64 KB */
+      UCHAR nss2 = (UCHAR)(g_hw_nss >= 2 && g_maxnss >= 2);
+
+      g_frame[k++] = 191; g_frame[k++] = 12;
+      g_frame[k++] = 0x20; g_frame[k++] = 0; g_frame[k++] = 0x80; g_frame[k++] = 0x01;   /* info: 3895, SGI80, A-MPDU exp 3 */
+      g_frame[k++] = (UCHAR)(nss2 ? 0xFA : 0xFE); g_frame[k++] = 0xFF;                 /* rx MCS 0-9 for 1 (2) streams */
+      g_frame[k++] = 0; g_frame[k++] = 0;
+      g_frame[k++] = (UCHAR)(nss2 ? 0xFA : 0xFE); g_frame[k++] = 0xFF;                 /* tx MCS map                    */
+      g_frame[k++] = 0; g_frame[k++] = 0;
+   }
    if (n->wmm)
       for (i = 0; i < 9; i++)
          g_frame[k++] = g_wmm_ie[i];
@@ -1046,6 +1065,15 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
       g_j40 = 1;                                        /* the AP runs a 40 MHz channel and may use it here: so do we */
       g_jsco = n->sco;
    }
+   g_j80 = 0;                                           /* 80 MHz: the AP's VHT operation, our regulatory data, consistent offsets */
+   if (g_j40 && g_maxw >= 2 && n->vht && n->vhtw && n->ch > 14 && hw_chan_vht80(n->ch)) {
+      int d = (int)n->ch - (int)n->vcf0;
+
+      if ((d == -6 || d == -2) ? g_jsco == 1 : ((d == 2 || d == 6) ? g_jsco == 3 : 0)) {
+         g_j80 = 1;
+         g_jcf0 = n->vcf0;
+      }
+   }
    g_jaid = 0;
 
    if (hw_join_prepare(n)) { g_jfail = 9; abort_join(); return -1; }
@@ -1079,6 +1107,18 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
    g_jht_mcs[0] = h ? h[2 + 3] : 0;
    g_jht_mcs[1] = h ? h[2 + 4] : 0;
    g_ampdu_par = h ? h[2 + 2] : 0;
+   if (g_j80) {                                          /* the AP must confirm VHT in its response           */
+      UCHAR FAR *v = find_ie((UCHAR FAR *)g_assoc_res, g_assoc_reslen, 191);
+
+      if (!g_jht || !v || v[1] < 12)
+         g_j80 = 0;
+      else {
+         g_jvrx[0] = v[2 + 4];
+         g_jvrx[1] = v[2 + 5];
+         g_jvsgi80 = (UCHAR)((v[2] & 0x20) != 0);
+         g_jvexp = (UCHAR)(((v[2 + 2] >> 7) & 1) | ((v[2 + 3] & 3) << 1));   /* maximum A-MPDU length exponent */
+      }
+   }
    g_jaid = g_assoc_aid;
    g_jcaps = g_assoc_caps;
    for (pos = 0; pos < 32; pos++)
@@ -1115,7 +1155,7 @@ void sta_leave(void)
    ba_reset_all();
    atx_reset();
    g_jht = 0;
-   g_j40 = g_jsco = 0;
+   g_j40 = g_jsco = g_j80 = 0;
    g_jnss = 1;
    abort_join();
    g_link_lost = 0;

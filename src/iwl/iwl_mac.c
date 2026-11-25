@@ -231,9 +231,11 @@ static int add_sta(USHORT update)
       c.station_flags_msk |= STA_FLG_MAX_AGG_SIZE_MSK | STA_FLG_AGG_MPDU_DENS_MSK;
       if (two_streams())
          c.station_flags |= STA_FLG_MIMO_EN_MIMO2;
-      if (g_j40)
+      if (g_j80)
+         c.station_flags |= STA_FLG_FAT_EN_80MHZ;
+      else if (g_j40)
          c.station_flags |= STA_FLG_FAT_EN_40MHZ;
-      c.station_flags |= (ULONG)(g_ampdu_par & 3) << STA_FLG_MAX_AGG_SIZE_SHIFT;
+      c.station_flags |= (ULONG)(g_j80 ? g_jvexp : (g_ampdu_par & 3)) << STA_FLG_MAX_AGG_SIZE_SHIFT;
       c.station_flags |= (ULONG)((g_ampdu_par >> 2) & 7) << STA_FLG_AGG_MPDU_DENS_SHIFT;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
@@ -292,8 +294,12 @@ void iwl_te_notif(UCHAR FAR *p, USHORT len)
 
 /* ---- rate table: the firmware walks it on retries (iwm_set_rate_table, without iwm's rate adaptation) ----- */
 /* The AP receives two streams, the radio has two chains and PROTOCOL.INI (STREAMS) allows it */
+static int vht_max_mcs(USHORT nss);
+
 static int two_streams(void)
 {
+   if (g_j80)
+      return g_hw_nss >= 2 && g_maxnss >= 2 && vht_max_mcs(2) >= 0;
    return g_jht && g_hw_nss >= 2 && g_maxnss >= 2 && g_jht_mcs[1] != 0;
 }
 
@@ -314,6 +320,27 @@ static ULONG ht_wide(USHORT j)
    return f;
 }
 
+/* VHT: the highest MCS the AP receives with n streams (0-7, 0-8 or 0-9), -1 when none (VHT MCS map, 2 bits per stream). */
+static int vht_max_mcs(USHORT nss)
+{
+   UCHAR v = (UCHAR)((g_jvrx[0] >> ((nss - 1) * 2)) & 3);
+
+   return v == 3 ? -1 : 7 + v;
+}
+
+/* As ht_wide: the first two attempts use 80 MHz (with RTS protection) and the short guard interval. */
+static ULONG vht_wide(USHORT j)
+{
+   ULONG f = 0;
+
+   if (j >= 2)
+      return 0UL;
+   f = RATE_MCS_CHAN_WIDTH_80 | RATE_MCS_RTS_REQUIRED_MSK;
+   if (g_jvsgi80)
+      f |= RATE_MCS_SGI_MSK;
+   return f;
+}
+
 static int send_lq(void)
 {
    static lq_cmd_t c;
@@ -328,7 +355,25 @@ static int send_lq(void)
    c.agg_time_limit = 4000;
    c.agg_disable_start_th = 3;
    c.agg_frame_cnt_limit = 0x3F;
-   if (g_jht) {
+   if (g_jht && g_j80) {                           /* VHT: up to 8 two-stream rates, then single-stream ones     */
+      int top, k;
+
+      top = (g_hw_nss >= 2 && g_maxnss >= 2) ? vht_max_mcs(2) : -1;
+      for (k = 0; top >= 0 && k < 8 && top - k >= 0; k++)
+      {
+         ULONG f = (ULONG)(top - k) | ((ULONG)1 << RATE_VHT_MCS_NSS_POS) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_AB_MSK | vht_wide(j);
+
+         c.rs_table[j++] = f;
+      }
+      c.mimo_delim = (UCHAR)j;
+      top = vht_max_mcs(1);
+      for (k = 0; top >= 0 && k < 8 && top - k >= 0 && j < 16; k++)
+      {
+         ULONG f = (ULONG)(top - k) | RATE_MCS_VHT_MSK | RATE_MCS_ANT_A_MSK | vht_wide(j);
+
+         c.rs_table[j++] = f;
+      }
+   } else if (g_jht) {
       if (two_streams()) {                         /* two streams first: MCS 15 .. 8, then the single-stream ones */
          for (m = 8; m-- > 0 && j < 16; )
             if (g_jht_mcs[1] & (1 << m)) {
@@ -397,7 +442,7 @@ int hw_join_prepare(net_t *n)
    if (!g_hw_ready)
       return -1;
    scan_rates((UCHAR FAR *)n->ie + 12, (USHORT)(n->ielen > 12 ? n->ielen - 12 : 0), hi);
-   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, n->ch, 1, 1, 0))
+   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, n->ch, 1, 1, 0, 0))
       return -2;
    if (mac_ctxt(FW_CTXT_ACTION_ADD, 0))
       return -3;
@@ -415,13 +460,32 @@ int hw_join_prepare(net_t *n)
    return 0;
 }
 
+/* The channel the link runs on: width and the position of the primary channel in it (Linux iwl_mvm_get_ctrl_pos). */
+static UCHAR join_width(void)
+{
+   return (UCHAR)(g_j80 ? PHY_VHT_CHANNEL_MODE80 : (g_j40 ? PHY_VHT_CHANNEL_MODE40 : PHY_VHT_CHANNEL_MODE20));
+}
+
+static UCHAR join_ctrl(void)
+{
+   if (g_j80) {
+      int d = (int)g_jch - (int)g_jcf0;              /* channel numbers are 5 MHz apart: -6 = 30 MHz below the centre */
+
+      return (UCHAR)(d <= -6 ? PHY_VHT_CTRL_POS_2_BELOW : (d < 0 ? PHY_VHT_CTRL_POS_1_BELOW :
+                     (d < 6 ? PHY_VHT_CTRL_POS_1_ABOVE : PHY_VHT_CTRL_POS_2_ABOVE)));
+   }
+   if (g_j40)
+      return (UCHAR)(g_jsco == 3 ? PHY_VHT_CTRL_POS_1_ABOVE : PHY_VHT_CTRL_POS_1_BELOW);
+   return PHY_VHT_CTRL_POS_1_BELOW;
+}
+
 int hw_join_complete(void)
 {
    UCHAR ch = (UCHAR)(two_streams() ? 2 : 1);
 
    scan_rates((UCHAR FAR *)g_jres, g_jreslen, (UCHAR)(g_jch > 14));
    g_jnss = (UCHAR)(two_streams() ? 2 : 1);
-   if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch, (UCHAR)(g_j40 ? g_jsco : 0)))
+   if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch, join_width(), join_ctrl()))
       return -1;
    if (add_sta(1))
       return -2;
@@ -462,7 +526,7 @@ void hw_leave(void)
       mac_ctxt(FW_CTXT_ACTION_REMOVE, 0);
       g_mac_on = 0;
    }
-   iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0);
+   iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0);
 }
 
 /* ---- receive aggregation -------------------------------------------------------------------------------------

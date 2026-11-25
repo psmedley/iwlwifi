@@ -27,8 +27,8 @@
    ; rates cause trouble with a particular access point.
    ; STREAMS = 1
 
-   ; Optional: widest channel to use, 20 or 40 (default 40: used when the access point and the regulatory data
-   ; allow it). 80 MHz is not implemented. Set 20 to compare.
+   ; Optional: widest channel to use, 20, 40 or 80 (default 80: used when the access point (VHT) and the regulatory
+   ; data allow it). Set 40 or 20 to compare.
    ; MAXWIDTH = 20
 
    ; Optional: receive aggregation (A-MPDU), 0 or 1 (default 1). Set 0 to compare, or if downloads stall.
