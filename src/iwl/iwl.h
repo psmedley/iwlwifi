@@ -598,6 +598,7 @@ typedef struct {
 } mac_power_cmd_t;
 typedef struct { ULONG v[11]; } beacon_filter_cmd_t;
 typedef struct { UCHAR filter_own, port_id, count, pass_all; UCHAR bssid[6]; UCHAR reserved[2]; } mcast_filter_cmd_t;
+typedef struct { ULONG num_temps; USHORT thresholds[8]; } temp_report_ths_cmd_t;   /* GRP_PHY_TEMP_REPORTING_THRESHOLDS_CMD */
 typedef struct { ULONG mode, enabled_modules; } bt_coex_cmd_t;
 #define BT_COEX_WIFI            0x3UL
 #define BT_COEX_HIGH_BAND_RET   0x10UL
@@ -768,6 +769,17 @@ extern USHORT g_fw_chunk_done;
 int    iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHORT flags);
 int    iwl_cmd1(USHORT id, UCHAR FAR *d, USHORT len);
 int    iwl_cmd_status(USHORT id, UCHAR FAR *d, USHORT len, ULONG FAR *status);   /* status may be on the stack */
+int    iwl_mem_rd(ULONG addr, ULONG FAR *dst, USHORT dwords);
+void   iwl_dump_fw_error(void);                 /* read the firmware error tables into g_errlog / g_uerrlog */
+#define ERRLOG_DW   36
+#define UERRLOG_DW  15
+extern ULONG  g_errlog[ERRLOG_DW], g_uerrlog[UERRLOG_DW];
+extern USHORT g_errlog_ok, g_uerrlog_ok;
+#define CLOG_N      12
+typedef struct { USHORT id; short rc; ULONG info; } clog_t;   /* a host command and how it ended              */
+extern clog_t g_clog[CLOG_N];
+extern USHORT g_clog_n;
+extern ULONG  g_cmd_err;                        /* error_type of the last REPLY_ERROR answer                */
 extern UCHAR FAR *g_resp;                       /* payload of the last response (CMDF_WANT_RESP)          */
 extern USHORT g_resp_len, g_resp_failed;
 

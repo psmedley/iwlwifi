@@ -134,6 +134,19 @@ int iwl_mem_wr(ULONG addr, UCHAR FAR *src, USHORT dwords)
    return 0;
 }
 
+int iwl_mem_rd(ULONG addr, ULONG FAR *dst, USHORT dwords)
+{
+   USHORT i;
+
+   if (!iwl_nic_lock())
+      return -1;
+   iwl_wr(HBUS_TARG_MEM_RADDR, addr);           /* auto-increments                                       */
+   for (i = 0; i < dwords; i++)
+      dst[i] = iwl_rd(HBUS_TARG_MEM_RDAT);
+   iwl_nic_unlock();
+   return 0;
+}
+
 int iwl_mem_wr32(ULONG addr, ULONG v)
 {
    static UCHAR b[4];
@@ -149,7 +162,7 @@ static ULONG  g_intmask;
 static USHORT g_trans_on;                       /* registers mapped, device powered: interrupts may be ours */
 static USHORT g_irq_masked;
 static USHORT g_auxq, g_dataq;
-void   iwl_cmd_answer(UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len);                  /* DQA: aux 1, data 5..8; legacy: aux 15, data 0..3       */
+void   iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len);                  /* DQA: aux 1, data 5..8; legacy: aux 15, data 0..3       */
 USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
 
 /* ---- DMA memory ------------------------------------------------------------------------------------ */
@@ -363,7 +376,7 @@ static void rx_buffer(USHORT i)
          if (q->queued)
             q->queued--;
          q->tail = (USHORT)((p[6] + 1) & 0xFF);
-         iwl_cmd_answer(p[6], p[5], p + 8, (USHORT)(plen - 4));
+         iwl_cmd_answer(code, p[6], p[5], p + 8, (USHORT)(plen - 4));
       }
       off = (USHORT)(off + ((total + FH_RSCSR_FRAME_ALIGN - 1) & ~(FH_RSCSR_FRAME_ALIGN - 1)));
    }
@@ -911,14 +924,48 @@ static void kick(txq_t *q)
 
 /* ---- host commands --------------------------------------------------------------------------------------- */
 static USHORT g_cmd_done, g_cmd_wait_idx = 0xFFFF;
+clog_t g_clog[CLOG_N];
+USHORT g_clog_n;
+ULONG  g_cmd_err;
+ULONG  g_errlog[ERRLOG_DW], g_uerrlog[UERRLOG_DW];
+USHORT g_errlog_ok, g_uerrlog_ok;
+
+static void clog(USHORT id, int rc, ULONG info)
+{
+   clog_t *c = &g_clog[g_clog_n % CLOG_N];
+
+   c->id = id;
+   c->rc = (short)rc;
+   c->info = info;
+   g_clog_n++;
+}
+
+/* The firmware's error log (iwm_nic_error / iwm_nic_umac_error): valid, error id, ... in device SRAM. */
+void iwl_dump_fw_error(void)
+{
+   if (g_errlog_ok || !g_trans_on)
+      return;
+   if (g_err_table >= 0x800000UL && iwl_mem_rd(g_err_table, (ULONG FAR *)g_errlog, ERRLOG_DW) == 0)
+      g_errlog_ok = 1;
+   if (g_umac_err_table >= 0x800000UL && iwl_mem_rd(g_umac_err_table, (ULONG FAR *)g_uerrlog, UERRLOG_DW) == 0)
+      g_uerrlog_ok = 1;
+   if (g_errlog_ok) {
+      tstr("[iwl: firmware error id "); th32(g_errlog[1]); tstr(" data "); th32(g_errlog[7]); tcom(' ');
+      th32(g_errlog[8]); tcom(' '); th32(g_errlog[9]); tstr(" last cmd "); th32(g_errlog[25]); tcom(']'); tnl();
+   }
+}
 static USHORT g_cmd_want;
 
 /* Called from iwl_rx_pkt for every packet that answers a host command (qid = command queue, bit 7 clear). */
-void iwl_cmd_answer(UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len)
+void iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len)
 {
    if (idx != g_cmd_wait_idx)
       return;
    g_resp_failed = (USHORT)((flags & CMD_FAILED_MSK) != 0);
+   if (code == CMD_REPLY_ERROR) {                /* the firmware refused the command: it answers with REPLY_ERROR */
+      g_resp_failed = 1;
+      g_cmd_err = (len >= 4) ? get32(p) : 0xFFFFFFFFUL;
+   }
    if (g_cmd_want) {
       if (len > 4000)
          len = 4000;
@@ -981,14 +1028,28 @@ int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHOR
    g_resp_failed = 0;
    g_cmd_wait_idx = idx;
    kick(q);
+   g_cmd_err = 0;
    if (hw_wait(&g_cmd_done, 2000)) {
       g_cmd_to++;
       g_cmd_wait_idx = 0xFFFF;
+      if (g_fw_error) {
+         dd_err("the firmware crashed during command", (ULONG)id);
+         iwl_dump_fw_error();
+         clog(id, -7, g_errlog_ok ? g_errlog[1] : 0UL);
+         return -7;
+      }
       dd_err("firmware command timed out, id", (ULONG)id);
+      clog(id, -4, 0UL);
       return -4;
    }
    g_cmd_wait_idx = 0xFFFF;
-   return g_resp_failed ? -5 : 0;
+   if (g_resp_failed) {
+      dd_err("the firmware refused command", (ULONG)id);
+      clog(id, -5, g_cmd_err);
+      return -5;
+   }
+   clog(id, 0, 0UL);
+   return 0;
 }
 
 int iwl_cmd1(USHORT id, UCHAR FAR *d, USHORT len)

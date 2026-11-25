@@ -349,6 +349,8 @@ static void step(USHORT n)
 static int fail(const char *what, ULONG v)
 {
    dd_err(what, v);
+   if (g_fw_error)
+      iwl_dump_fw_error();
    g_hw_failed = 1;
    return -1;
 }
@@ -475,9 +477,9 @@ int hw_up(void)
    if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1))
       return fail("PHY context add failed", 0UL);
    if (FW_CAPA(CAPA_CT_KILL_BY_FW)) {
-      static UCHAR ths[44];                        /* empty temperature thresholds: the firmware handles CT-kill */
+      static temp_report_ths_cmd_t ths;            /* no thresholds (num_temps 0): the firmware handles CT-kill  */
 
-      if (iwl_cmd1(WIDE_ID(PHY_OPS_GROUP, CMD_TEMP_REPORTING_THRESHOLDS), (UCHAR FAR *)ths, sizeof(ths)))
+      if (iwl_cmd1(WIDE_ID(PHY_OPS_GROUP, CMD_TEMP_REPORTING_THRESHOLDS), (UCHAR FAR *)&ths, sizeof(ths)))
          tstr("[iwl: temperature thresholds refused]");
    }
    if (iwl_send_power())
@@ -545,6 +547,35 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps("/"); ph(g_last_unhandled, 4); ps(" CMDTO="); ph(g_cmd_to, 4); nl();
    ps("FWERR="); ph(g_fw_error, 4); ps(" HWERR="); ph(g_hw_err, 4); ps(" REPLYERR="); ph(g_fw_errors_seen, 4);
    ps(" type="); ph(g_last_fw_err, 8); ps(" cmd="); ph(g_last_fw_err_cmd, 2); nl();
+   ps("CMDS="); ph(g_clog_n, 4); ps(" (oldest first, id/result/info):");
+   {
+      USHORT n = g_clog_n, first = (n > CLOG_N) ? (USHORT)(n - CLOG_N) : 0, k;
+
+      for (k = first; k < n; k++) {
+         clog_t *c = &g_clog[k % CLOG_N];
+
+         ps(" "); ph(c->id, 4); ps("/"); ph((ULONG)(USHORT)c->rc, 4);
+         if (c->info) { ps("/"); ph(c->info, 8); }
+      }
+   }
+   nl();
+   if (g_errlog_ok) {
+      ps("FWLOG valid="); ph(g_errlog[0], 8); ps(" id="); ph(g_errlog[1], 8); ps(" data="); ph(g_errlog[7], 8);
+      ps(","); ph(g_errlog[8], 8); ps(","); ph(g_errlog[9], 8); ps(" blink2="); ph(g_errlog[4], 8);
+      ps(" ilink="); ph(g_errlog[5], 8); ps(","); ph(g_errlog[6], 8); nl();
+      ps("FWLOG fwrev="); ph(g_errlog[15], 8); ps("/"); ph(g_errlog[16], 8); ps("/"); ph(g_errlog[17], 8);
+      ps(" hw="); ph(g_errlog[18], 8); ps(" board="); ph(g_errlog[19], 8); ps(" pc="); ph(g_errlog[20], 8);
+      ps(" fp="); ph(g_errlog[21], 8); ps(" sp="); ph(g_errlog[22], 8); nl();
+      ps("FWLOG hcmd="); ph(g_errlog[23], 8); ps(" isr="); ph(g_errlog[24], 8); ps(","); ph(g_errlog[25], 8);
+      ps(","); ph(g_errlog[26], 8); ps(","); ph(g_errlog[27], 8); ps(","); ph(g_errlog[28], 8);
+      ps(" lastcmdid="); ph(g_errlog[29], 8); ps(" waitevent="); ph(g_errlog[30], 8); nl();
+   }
+   if (g_uerrlog_ok) {
+      ps("UMACLOG valid="); ph(g_uerrlog[0], 8); ps(" id="); ph(g_uerrlog[1], 8); ps(" data="); ph(g_uerrlog[6], 8);
+      ps(","); ph(g_uerrlog[7], 8); ps(","); ph(g_uerrlog[8], 8); ps(" blink="); ph(g_uerrlog[2], 8);
+      ps(","); ph(g_uerrlog[3], 8); ps(" ilink="); ph(g_uerrlog[4], 8); ps(","); ph(g_uerrlog[5], 8);
+      ps(" cmd="); ph(g_uerrlog[13], 8); ps(" isr="); ph(g_uerrlog[14], 8); nl();
+   }
    ps("SCAN n="); ph(g_scan_n, 4); ps(" done="); ph(g_scan_done, 1); ps(" MPDU="); ph(g_rx_mpdu, 4);
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
    ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_tx_queued(), 2); nl();

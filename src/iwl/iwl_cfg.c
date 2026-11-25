@@ -40,6 +40,8 @@ SIZE_IS(scan_config_t, 36);
 SIZE_IS(scan_chan_umac_t, 8);
 SIZE_IS(missed_beacons_notif_t, 20);
 SIZE_IS(error_resp_t, 20);
+SIZE_IS(temp_report_ths_cmd_t, 20);
+SIZE_IS(bt_coex_cmd_t, 8);
 
 /* ---- family configurations --------------------------------------------------------------------------- */
 /* Only the 8000 family is driven by this build. The others are listed so that the driver can name what it

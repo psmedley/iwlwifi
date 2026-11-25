@@ -83,4 +83,21 @@ AUTHORIZED` the installed keys. `DECFAIL=` counts frames the firmware could not 
 `IRQS=` grows while the adapter is busy; `SPUR=` counts interrupts on a shared line that were not ours. `IRQS=0` with
 everything working means the driver runs polled (ARCHITECTURE.md section 8, question 1).
 
+## 7. Hardware results
+
+**Run 1** (8260, subsystem 8086:0010, rev 3A, IRQ 12, BAR0 EC000000; build 3a8d465): the driver loaded; the status
+text before the firmware was as expected. After the copy: `STATE=0025 FAILED`, `LASTERR=POWER_TABLE failed`.
+Everything before that worked: `FWVER=36.c8e8e144.0`, ALIVE twice (`ALIVE=11`), `HWMAC=40:A3:CC:4F:31:02`,
+`NVM ver=0E56 chans=26 5G=1 11n=1 11ac=1 txant=3 rxant=3 LAR=1`, `PHYDB=0F`, 115 interrupts delivered (`IRQHOOKED=1`),
+46 firmware packets received. Then `FWERR=1` (the firmware crashed), `CMDTO=1`, `REPLYERR=1`, last packet `0002`
+(REPLY_ERROR). Cause suspected: the temperature-thresholds command was sent with 44 bytes instead of 20 (fixed;
+a REPLY_ERROR answer is now treated as a failed command).
+
+New status lines for a failure of this kind:
+
+* `CMDS=n (oldest first, id/result/info): ...` the last 12 host commands: `id` (group in the high byte), result
+  `0000` ok, `FFFB` refused by the firmware (info = its error type), `FFFC` no answer, `FFF9` the firmware crashed.
+* `FWLOG ...` and `UMACLOG ...`: the firmware's own error table, read after a crash (`id=` is the error code,
+  `data=` three error-specific words, `lastcmdid=`/`hcmd=` the command it was handling). Please send these.
+
 Please send the full `copy \DEV\WRND32$ con` output and the COM1 log with any report.

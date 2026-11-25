@@ -12,10 +12,13 @@ The chip side is a port of OpenBSD's **iwm(4)** (ISC licence), cross-checked lin
 **iwlwifi** (`pcie/`, `mvm/`, `fw/api/`). It is a 16-bit physical device driver built with Open Watcom 2.0 and
 NASM; no IBM DDK is needed.
 
-> **Status: written, builds cleanly, untested on hardware.** The firmware-file parser has been run on the real
-> `iwlwifi-8000C-36.ucode`; every firmware structure has a compile-time size check against the layout gcc gives
-> OpenBSD's definitions. Nothing has run on an 8260 yet. Read [docs/TESTING.md](docs/TESTING.md) before trying
-> it; a COM1 cable helps but is not required: the driver state can be read from `\DEV\WRND32$`.
+> **Status: first hardware results.** On an 8260 (`8086:24F3`, subsystem `8086:0010`, rev 3A) the driver loads and
+> registers with NDIS, the firmware file is accepted, and bring-up gets through both firmware images (INIT and
+> runtime, with paging), the NVM (MAC address, 26 channels, 2.4/5 GHz, 11n/11ac, LAR), calibration (15 PHY DB
+> sections), DQA, the auxiliary station and the PHY context, with working interrupts. It then stopped on a firmware
+> error at the power/temperature commands; see [docs/TESTING.md](docs/TESTING.md), "Hardware results". Scanning and
+> joining have not been reached yet. A COM1 cable helps but is not required: the driver state can be read from
+> `\DEV\WRND32$`.
 
 ## What it does
 
