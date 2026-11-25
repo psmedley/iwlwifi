@@ -92,6 +92,16 @@ To compare, put `MAXWIDTH = 20` and `STREAMS = 1` in the `[IWLWIFI_NIF]` section
 channel with `CHANNEL = 149` (or 36, 40, 44, 48: channels 52-144 are DFS channels that the firmware may refuse to
 transmit on until it has checked for radar, so they are a poorer first test).
 
+## 5c. Receive aggregation
+
+`BA(rx aggregation) sessions=` counts the block-ack sessions the AP started (`refused=` the ones we could not take:
+no free session, no HT, or no memory), `direct=` frames handed on at once, `reordered=` frames that were held and
+released, `old=`/`dup=` frames dropped as duplicates, `timeouts=` holes closed after 100 ms, `maxheld=` the most frames
+held at once. `ASYNC ok= fail=` counts the firmware's answers to the ADD_STA commands that start and stop sessions
+(`fail` should stay 0; a failed one also appears in `CMDS=` as `8018/FFF3/<status>`). While downloading, `sessions=`
+should become non-zero and `reordered=` should grow; compare the speed with `AMPDU = 0` in PROTOCOL.INI. If a download
+stalls or TCP slows to a crawl, send me the BA line, `timeouts=` high means the AP's frames are not arriving.
+
 ## 6. Interrupts
 
 `IRQS=` grows while the adapter is busy; `SPUR=` counts interrupts on a shared line that were not ours. `IRQS=0` with

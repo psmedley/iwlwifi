@@ -245,14 +245,174 @@ static int tx_deauth(void)
    return hw_mgmt_tx((UCHAR FAR *)g_frame, 26);
 }
 
-/* Refuse a block-ack agreement (ADDBA request from the AP): status 37, request declined. Without an answer
- * some APs keep asking; with a refusal they send plain MPDUs. */
-static void tx_addba_refuse(UCHAR FAR *req, USHORT rlen)
+/* ---- receive aggregation (A-MPDU, block-ack sessions) ---------------------------------------------------------
+ * The AP asks for a session with an ADDBA request (action frame, category 3). We accept it: the firmware is told
+ * (hw_ba_start) so that it answers the AP's aggregates with block acks, and the frames of that TID are put back in
+ * sequence-number order here, in a reorder buffer (mac80211 ieee80211_sta_manage_reorder_buf, which iwm also leaves
+ * to net80211 for this firmware). A frame that is missing for BA_HOLD_MS is skipped. Frames are held as Ethernet
+ * frames in DMA memory (allocated at join time: the receive path must not allocate). */
+#define BA_N        2                                   /* sessions at once                                   */
+#define BA_WIN      32                                  /* window: a power of two (the slot of a number is sn % win) */
+#define BA_SLOT     1520
+#define BA_HOLD_MS  100
+
+typedef struct {
+   UCHAR  active, tid;
+   USHORT win, head, stored;                            /* head: the next sequence number to hand on          */
+   USHORT len[BA_WIN];                                  /* 0 = slot free                                      */
+   ULONG  stamp[BA_WIN];
+} ba_t;
+
+static ba_t   g_ba[BA_N];
+static DMA    g_ba_buf[BA_N];
+static UCHAR  g_ba_buf_ok[BA_N];
+UCHAR  g_ampdu = 1;
+USHORT g_ba_started, g_ba_refused, g_ba_stopped, g_ba_rel, g_ba_old, g_ba_dup, g_ba_to, g_ba_max, g_ba_direct;
+
+static void rx_eth(UCHAR FAR *eth, USHORT len);
+
+static USHORT sn_sub(USHORT a, USHORT b)  { return (USHORT)((a - b) & 0x0FFF); }
+static int    sn_less(USHORT a, USHORT b) { return sn_sub(a, b) > 2048; }
+
+static UCHAR FAR *ba_slot(USHORT bi, USHORT idx)
+{
+   return DPTR(g_ba_buf[bi]) + idx * BA_SLOT;
+}
+
+/* Buffers for the sessions: called at the end of a join (request path). */
+static void ba_alloc(void)
+{
+   USHORT i;
+
+   for (i = 0; i < BA_N; i++)
+      if (!g_ba_buf_ok[i] && dma_get((USHORT)(BA_WIN * BA_SLOT), &g_ba_buf[i]) == 0)
+         g_ba_buf_ok[i] = 1;
+}
+
+static void ba_out(USHORT bi, ba_t *b, USHORT idx)      /* hand a held frame to the stack                      */
+{
+   USHORT l = b->len[idx];
+
+   b->len[idx] = 0;
+   b->stored--;
+   g_ba_rel++;
+   rx_eth(ba_slot(bi, idx), l);
+}
+
+static void ba_release_to(USHORT bi, ba_t *b, USHORT newhead)   /* everything below newhead, in order            */
+{
+   while (b->head != newhead) {
+      USHORT idx = (USHORT)(b->head % b->win);
+
+      if (b->len[idx])
+         ba_out(bi, b, idx);
+      b->head = (USHORT)((b->head + 1) & 0x0FFF);
+   }
+}
+
+static void ba_release_consec(USHORT bi, ba_t *b)       /* the frames that are now in sequence                  */
+{
+   while (b->stored) {
+      USHORT idx = (USHORT)(b->head % b->win);
+
+      if (!b->len[idx])
+         break;
+      ba_out(bi, b, idx);
+      b->head = (USHORT)((b->head + 1) & 0x0FFF);
+   }
+}
+
+static void ba_input(USHORT bi, ba_t *b, USHORT sn, UCHAR FAR *eth, USHORT len)
+{
+   USHORT idx;
+
+   if (sn_less(sn, b->head)) {                          /* behind the window: a duplicate                      */
+      g_ba_old++;
+      return;
+   }
+   if (!sn_less(sn, (USHORT)((b->head + b->win) & 0x0FFF)))   /* beyond the window: move it, handing on what falls off */
+      ba_release_to(bi, b, (USHORT)((sn - b->win + 1) & 0x0FFF));
+   idx = (USHORT)(sn % b->win);
+   if (b->len[idx]) {
+      g_ba_dup++;
+      return;
+   }
+   if (sn == b->head && !b->stored) {                   /* in order and nothing held: no need to keep it       */
+      b->head = (USHORT)((b->head + 1) & 0x0FFF);
+      g_ba_direct++;
+      rx_eth(eth, len);
+      return;
+   }
+   fmemcpy(ba_slot(bi, idx), eth, len);
+   b->len[idx] = len;
+   b->stamp[idx] = dd_ms();
+   b->stored++;
+   if (b->stored > g_ba_max)
+      g_ba_max = b->stored;
+   ba_release_consec(bi, b);
+}
+
+/* Service path, after every run: a frame that has waited too long for the ones before it is handed on anyway
+ * (with everything before it), until what is still held has not waited long enough. */
+void sta_rx_tick(void)
+{
+   USHORT i, k, idx;
+   ULONG  now = 0;
+
+   for (i = 0; i < BA_N; i++) {
+      ba_t *b = &g_ba[i];
+
+      while (b->active && b->stored) {
+         if (!now)
+            now = dd_ms();
+         for (k = 0; k < b->win; k++) {                 /* the held frame with the lowest sequence number       */
+            idx = (USHORT)(((b->head + k) & 0x0FFF) % b->win);
+            if (b->len[idx])
+               break;
+         }
+         if (k == b->win || (long)(now - b->stamp[idx]) <= (long)BA_HOLD_MS)
+            break;
+         ba_release_to(i, b, (USHORT)((b->head + k + 1) & 0x0FFF));
+         ba_release_consec(i, b);
+         g_ba_to++;
+      }
+   }
+}
+
+static void ba_flush(USHORT bi, ba_t *b)                /* hand on everything held, in order, and close         */
+{
+   if (b->stored)
+      ba_release_to(bi, b, (USHORT)((b->head + b->win) & 0x0FFF));
+   b->active = 0;
+}
+
+static void ba_reset_all(void)                          /* the link is gone: nothing to hand on                */
+{
+   USHORT i, k;
+
+   for (i = 0; i < BA_N; i++) {
+      g_ba[i].active = 0;
+      g_ba[i].stored = 0;
+      for (k = 0; k < BA_WIN; k++)
+         g_ba[i].len[k] = 0;
+   }
+}
+
+static int ba_find(UCHAR tid)
+{
+   USHORT i;
+
+   for (i = 0; i < BA_N; i++)
+      if (g_ba[i].active && g_ba[i].tid == tid)
+         return (int)i;
+   return -1;
+}
+
+/* ADDBA response (action 1): body = dialog token, status, BA parameters, timeout (the request's, as mac80211 does) */
+static void tx_addba_resp(UCHAR FAR *req, USHORT status, USHORT params)
 {
    static UCHAR f[33];                                 /* service path: not g_frame (the request path's)     */
 
-   if (rlen < 24 + 9)
-      return;
    rt_setmem((PVOID)f, 0, sizeof(f));
    f[0] = 0xD0;
    fmemcpy((UCHAR FAR *)f + 4, (UCHAR FAR *)g_target, 6);
@@ -262,10 +422,82 @@ static void tx_addba_refuse(UCHAR FAR *req, USHORT rlen)
    f[24] = 3;                                          /* category: block ack                               */
    f[25] = 1;                                          /* ADDBA response                                    */
    f[26] = req[24 + 2];                                /* dialog token                                      */
-   f[27] = 37; f[28] = 0;                              /* status: request declined                          */
-   f[29] = req[24 + 3]; f[30] = req[24 + 4];           /* block ack parameter set                           */
+   put16((UCHAR FAR *)f + 27, status);
+   put16((UCHAR FAR *)f + 29, params);
    f[31] = req[24 + 5]; f[32] = req[24 + 6];           /* timeout                                           */
    hw_mgmt_tx((UCHAR FAR *)f, 33);
+}
+
+static void ba_addba_request(UCHAR FAR *f, USHORT len)
+{
+   USHORT params, ssn, win, req;
+   UCHAR  tid;
+   int    bi;
+   ba_t  *b;
+
+   if (len < 24 + 9)
+      return;
+   params = get16(f + 27);                              /* A-MSDU 0, policy 1, TID 5..2, buffer size 15..6     */
+   tid = (UCHAR)((params >> 2) & 0x0F);
+   req = (USHORT)((params >> 6) & 0x03FF);
+   ssn = (USHORT)(get16(f + 31) >> 4);
+   bi = -1;
+   if (g_ampdu && g_joined && g_jht && (params & 0x0002) && tid < 8) {
+      bi = ba_find(tid);
+      if (bi >= 0) {                                    /* the AP starts the session again                     */
+         ba_flush((USHORT)bi, &g_ba[bi]);
+         hw_ba_stop(tid);
+      } else {
+         USHORT i;
+
+         for (i = 0; i < BA_N; i++)
+            if (!g_ba[i].active && g_ba_buf_ok[i]) { bi = (int)i; break; }
+      }
+   }
+   if (bi < 0) {                                        /* no (more) sessions: refuse, the AP sends single MPDUs */
+      g_ba_refused++;
+      tx_addba_resp(f, 37, params);                     /* status 37: request declined                         */
+      return;
+   }
+   win = req ? req : BA_WIN;
+   if (win > BA_WIN)
+      win = BA_WIN;
+   while (win & (win - 1))                              /* a power of two                                      */
+      win &= (USHORT)(win - 1);
+   b = &g_ba[bi];
+   if (hw_ba_start(tid, ssn, win)) {
+      g_ba_refused++;
+      tx_addba_resp(f, 37, params);
+      return;
+   }
+   b->tid = tid;
+   b->win = win;
+   b->head = ssn;
+   b->stored = 0;
+   rt_setmem((PVOID)b->len, 0, sizeof(b->len));
+   b->active = 1;
+   g_ba_started++;
+   tx_addba_resp(f, 0, (USHORT)(0x0002 | (tid << 2) | (win << 6)));   /* immediate, no A-MSDU, our window     */
+}
+
+static void ba_delba(UCHAR FAR *f, USHORT len)
+{
+   USHORT params;
+   UCHAR  tid;
+   int    bi;
+
+   if (len < 24 + 6)
+      return;
+   params = get16(f + 26);                              /* initiator 11, TID 15..12                            */
+   tid = (UCHAR)((params >> 12) & 0x0F);
+   if (!(params & 0x0800))                              /* the AP deletes a session of ours as recipient: not ours */
+      return;
+   bi = ba_find(tid);
+   if (bi >= 0) {
+      ba_flush((USHORT)bi, &g_ba[bi]);
+      hw_ba_stop(tid);
+      g_ba_stopped++;
+   }
 }
 
 static int tx_assoc(net_t *n)
@@ -342,7 +574,9 @@ static void sta_mgmt_rx(UCHAR FAR *f, USHORT len)
       g_link_lost = 1;
    } else if (fc0 == 0xD0 && len >= 26 && g_joined) {    /* action                                            */
       if (f[24] == 3 && f[25] == 0)                      /* block ack: ADDBA request                          */
-         tx_addba_refuse(f, len);
+         ba_addba_request(f, len);
+      else if (f[24] == 3 && f[25] == 2)                 /* block ack: DELBA                                  */
+         ba_delba(f, len);
    }
 }
 
@@ -413,8 +647,9 @@ static void rx_eth(UCHAR FAR *eth, USHORT len)
 /* An 802.11 frame from the air (FCS removed). Service path: must not block. */
 void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxflags, ULONG rxtime)
 {
-   UCHAR  fc0, fc1, type;
+   UCHAR  fc0, fc1, type, tid;
    USHORT hl;
+   int    bi;
 
    if (len < 24)
       return;
@@ -442,7 +677,9 @@ void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxfla
       return;
    }
    hl = 24;
+   tid = 0xFF;
    if (fc0 & 0x80) {                                   /* QoS data                                          */
+      tid = (UCHAR)(f[24] & 0x0F);
       if (f[24] & 0x80) {                              /* A-MSDU: not negotiated, not handled               */
          g_rx_drop[2]++;
          return;
@@ -471,7 +708,11 @@ void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxfla
    fmemcpy((UCHAR FAR *)g_eth, f + 4, 6);              /* destination = address 1                           */
    fmemcpy((UCHAR FAR *)g_eth + 6, f + 16, 6);         /* source = address 3 (From-DS)                      */
    fmemcpy((UCHAR FAR *)g_eth + 12, f + hl + 6, (USHORT)(len - hl - 6));   /* ethertype + payload               */
-   rx_eth((UCHAR FAR *)g_eth, (USHORT)(len - hl - 6 + 12));
+   bi = (tid < 8 && !(f[4] & 1)) ? ba_find(tid) : -1;   /* unicast QoS data of a block-ack session: in order   */
+   if (bi >= 0)
+      ba_input((USHORT)bi, &g_ba[bi], (USHORT)(get16(f + 22) >> 4), (UCHAR FAR *)g_eth, (USHORT)(len - hl - 6 + 12));
+   else
+      rx_eth((UCHAR FAR *)g_eth, (USHORT)(len - hl - 6 + 12));
    (void)rssi;
 }
 
@@ -662,6 +903,7 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
    g_joining = 0;
    if (g_want_open)
       g_authorized = 1;                                   /* nothing to wait for on an open network            */
+   ba_alloc();                                             /* the reorder buffers (not in the receive path)     */
    tstr("[joined aid "); th16(g_jaid); tstr("]"); tnl();
    return 0;
 }
@@ -673,6 +915,7 @@ void sta_leave(void)
    if (g_joined)
       tx_deauth();
    g_joined = g_authorized = g_ptk_on = 0;
+   ba_reset_all();
    g_jht = 0;
    g_j40 = g_jsco = 0;
    g_jnss = 1;

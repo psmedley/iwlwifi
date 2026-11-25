@@ -491,6 +491,8 @@ typedef struct {
 #define STA_FLG_MIMO_EN_MIMO2   0x10000000UL
 #define STA_FLG_FAT_EN_40MHZ    0x04000000UL
 #define STA_FLG_MAX_AGG_SIZE_64K 0x00180000UL   /* 3 << 19                                                */
+#define STA_MODIFY_ADD_BA_TID   0x08
+#define STA_MODIFY_REMOVE_BA_TID 0x10
 #define STA_MODIFY_TID_DISABLE_TX 0x02
 #define STA_MODIFY_QUEUES       0x80
 #define STA_LINK                0
@@ -775,6 +777,8 @@ extern USHORT g_fw_chunk_done;
 #define CMDF_WANT_RESP  0x0001
 int    iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHORT flags);
 int    iwl_cmd1(USHORT id, UCHAR FAR *d, USHORT len);
+int    iwl_cmd_async(USHORT id, UCHAR FAR *d, USHORT len);   /* never waits; for the receive path */
+extern USHORT g_async_ok, g_async_fail;
 int    iwl_cmd_status(USHORT id, UCHAR FAR *d, USHORT len, ULONG FAR *status);   /* status may be on the stack */
 int    iwl_mem_rd(ULONG addr, ULONG FAR *dst, USHORT dwords);
 void   iwl_dump_fw_error(void);                 /* read the firmware error tables into g_errlog / g_uerrlog */

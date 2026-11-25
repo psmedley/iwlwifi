@@ -244,7 +244,7 @@ void dd_dev_write(USHORT sfn, ULONG phys, USHORT n)
 }
 
 /* ---- status text ----------------------------------------------------------------------------------- */
-static char   g_txt[4096];
+static char   g_txt[6144];
 static USHORT g_tn;
 
 static void ps(const char *s) { while (*s && g_tn < sizeof(g_txt) - 1) g_txt[g_tn++] = *s++; }
@@ -315,6 +315,9 @@ static void build_status(void)
    ps("MGMTRX(from the AP, subtype 0-15; 1 assoc resp, 11 auth, 12 deauth, 10 disassoc, 13 action)=");
    for (i = 0; i < 16; i++) { ph(g_rx_mgmt[i], 2); ps(i < 15 ? "," : ""); }
    nl();
+   ps("BA(rx aggregation) sessions="); ph(g_ba_started, 4); ps(" refused="); ph(g_ba_refused, 4); ps(" ended="); ph(g_ba_stopped, 4);
+   ps(" direct="); ph(g_ba_direct, 4); ps(" reordered="); ph(g_ba_rel, 4); ps(" old="); ph(g_ba_old, 4);
+   ps(" dup="); ph(g_ba_dup, 4); ps(" timeouts="); ph(g_ba_to, 4); ps(" maxheld="); ph(g_ba_max, 2); nl();
    ps("LAT irq2hook max="); ph(g_lat_max, 4); ps("ms n="); ph(g_lat_n, 4); nl();
    hw_status(ps, ph, nl);                                  /* the back end's own lines                         */
    for (i = 0; i < g_nnet; i++) {

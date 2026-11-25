@@ -440,6 +440,7 @@ static void service_once(void)
          ;                                        /* the ALIVE packet in the receive ring is what counts   */
    }
    rx_service();
+   sta_rx_tick();                                 /* block-ack reorder buffers: frames that waited too long   */
 }
 
 void hw_service(void)
@@ -958,8 +959,23 @@ static USHORT g_cmd_want;
 /* Called from iwl_rx_pkt for every packet that answers a host command (qid = command queue, bit 7 clear). */
 void iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len)
 {
-   if (idx != g_cmd_wait_idx)
+   if (idx != g_cmd_wait_idx) {                  /* an asynchronous command's answer (or a late one)       */
+      if (code == CMD_REPLY_ERROR) {
+         g_async_fail++;
+         clog((USHORT)(0x8000U | (len > 4 ? p[4] : 0)), -5, len >= 4 ? get32(p) : 0UL);
+      } else if (code == CMD_ADD_STA && len >= 4) {
+         if ((get32(p) & 0xFFUL) == ADD_STA_SUCCESS)
+            g_async_ok++;
+         else {
+            g_async_fail++;
+            clog(0x8018U, -13, get32(p));
+         }
+      } else if (flags & CMD_FAILED_MSK) {
+         g_async_fail++;
+         clog((USHORT)(0x8000U | code), -5, 0UL);
+      }
       return;
+   }
    g_resp_failed = (USHORT)((flags & CMD_FAILED_MSK) != 0);
    if (code == CMD_REPLY_ERROR) {                /* the firmware refused the command: it answers with REPLY_ERROR */
       g_resp_failed = 1;
@@ -974,10 +990,15 @@ void iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT le
    g_cmd_done = 1;
 }
 
-int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHORT flags)
+static USHORT g_cmdlk;                          /* the command ring: the request path and the receive path both queue commands */
+USHORT g_async_ok, g_async_fail;
+
+/* Build a command in the next slot of the command ring and kick it. A synchronous command (async 0) sets up the
+ * wait state first; an asynchronous one must fit a slot and nobody waits for its answer. Returns 0 or < 0. */
+static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHORT flags, USHORT async)
 {
    txq_t *q = &g_txq[0];
-   USHORT idx = q->cur, pay = (USHORT)(l0 + l1), hl, group = (USHORT)(id >> 8);
+   USHORT idx, pay = (USHORT)(l0 + l1), hl, group = (USHORT)(id >> 8), fl;
    UCHAR FAR *c;
    ULONG  ph;
    static ULONG  a[1];
@@ -987,18 +1008,28 @@ int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHOR
       return -1;
    if (pay > MAX_CMD_PAYLOAD_SIZE)
       return -2;
+   hl = (USHORT)(group ? 8 : 4);
+   if (async && pay + hl > CMD_SLOT_SZ)
+      return -2;
+   fl = rt_irq_save();
+   if (rt_lock_acquire(&g_cmdlk, (USHORT)(rt_cpu_id() + 1))) {
+      rt_irq_restore(fl);
+      return -8;
+   }
    if (q->queued >= CMD_SLOTS - 1) {
+      rt_lock_release(&g_cmdlk);
+      rt_irq_restore(fl);
       dd_err("command queue full", (ULONG)q->queued);
       return -3;
    }
-   hl = (USHORT)(group ? 8 : 4);
+   idx = q->cur;
    if (pay + hl <= CMD_SLOT_SZ) {
       USHORT s = (USHORT)(idx & (CMD_SLOTS - 1));
 
       c  = DPTR(q->buf) + s * CMD_SLOT_SZ;
       ph = q->buf.phys + (ULONG)(s * CMD_SLOT_SZ);
    } else {
-      c  = DPTR(g_bigcmd);                        /* commands are synchronous: one big buffer is enough     */
+      c  = DPTR(g_bigcmd);                        /* synchronous commands: one big buffer is enough         */
       ph = g_bigcmd.phys;
    }
    if (group) {
@@ -1021,13 +1052,28 @@ int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHOR
    n[0] = (USHORT)(hl + pay);
    tfd_set(q, idx, 1, (ULONG FAR *)a, (USHORT FAR *)n);
    sched_update(q->qid, idx, 0, 0);
-   g_cmd_done = 0;
-   g_cmd_want = (USHORT)(flags & CMDF_WANT_RESP);
-   g_resp_len = 0;
-   g_resp_failed = 0;
-   g_cmd_wait_idx = idx;
+   if (!async) {
+      g_cmd_done = 0;
+      g_cmd_want = (USHORT)(flags & CMDF_WANT_RESP);
+      g_resp_len = 0;
+      g_resp_failed = 0;
+      g_cmd_err = 0;
+      g_cmd_wait_idx = idx;
+   }
    kick(q);
-   g_cmd_err = 0;
+   rt_lock_release(&g_cmdlk);
+   rt_irq_restore(fl);
+   return 0;
+}
+
+int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHORT flags)
+{
+   int rc = cmd_queue(id, d0, l0, d1, l1, flags, 0);
+
+   if (rc) {
+      clog(id, rc, 0UL);
+      return rc;
+   }
    if (hw_wait(&g_cmd_done, 2000)) {
       g_cmd_to++;
       g_cmd_wait_idx = 0xFFFF;
@@ -1049,6 +1095,13 @@ int iwl_cmd(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT l1, USHOR
    }
    clog(id, 0, 0UL);
    return 0;
+}
+
+/* A command nobody waits for, usable from the receive path (it never blocks). The answer is only checked and
+ * counted (iwl_cmd_answer). */
+int iwl_cmd_async(USHORT id, UCHAR FAR *d, USHORT len)
+{
+   return cmd_queue(id, d, len, (UCHAR FAR *)0, 0, 0, 1);
 }
 
 int iwl_cmd1(USHORT id, UCHAR FAR *d, USHORT len)

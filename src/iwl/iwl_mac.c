@@ -462,6 +462,42 @@ void hw_leave(void)
    iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0);
 }
 
+/* ---- receive aggregation -------------------------------------------------------------------------------------
+ * iwm_sta_rx_agg / Linux iwl_mvm_sta_rx_agg for firmware without multi-queue receive: a modifying ADD_STA that adds
+ * (or removes) an "immediate BA" for a TID. The firmware then answers the AP's aggregates with block acks; the
+ * reordering of the frames is the host's job (wlan/sta.c). */
+static int ba_cmd(UCHAR tid, USHORT ssn, USHORT win, USHORT start)
+{
+   static add_sta_cmd_t c;                         /* static: the receive path calls this, one at a time    */
+
+   if (!g_sta_on || !g_assoc_on)
+      return -1;
+   fmemset((UCHAR FAR *)&c, 0, sizeof(c));
+   c.sta_id = STATION_ID;
+   c.mac_id_n_color = ID_AND_COLOR(0, 0);
+   c.add_modify = 1;
+   if (start) {
+      c.add_immediate_ba_tid = tid;
+      c.add_immediate_ba_ssn = ssn;
+      c.rx_ba_window = win;
+      c.modify_mask = STA_MODIFY_ADD_BA_TID;
+   } else {
+      c.remove_immediate_ba_tid = tid;
+      c.modify_mask = STA_MODIFY_REMOVE_BA_TID;
+   }
+   return iwl_cmd_async(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE));
+}
+
+int hw_ba_start(UCHAR tid, USHORT ssn, USHORT win)
+{
+   return ba_cmd(tid, ssn, win, 1);
+}
+
+int hw_ba_stop(UCHAR tid)
+{
+   return ba_cmd(tid, 0, 0, 0);
+}
+
 /* ---- keys -------------------------------------------------------------------------------------------------- */
 static int sta_key(UCHAR FAR *key, USHORT pairwise, UCHAR idx, USHORT remove)
 {

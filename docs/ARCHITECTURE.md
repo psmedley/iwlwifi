@@ -152,7 +152,19 @@ from `iwl/iwl_mac.c` in the order iwm uses:
 5. **data**: non-QoS data frames, To-DS, LLC/SNAP, sequence numbers from the driver (`TX_CMD_FLG_SEQ_CTL`), the rate
    from the rate table (`STA_RATE`). Received QoS and non-QoS data frames are converted to Ethernet; the CCMP header and
    the 8-byte MIC the firmware leaves in place are removed. EAPOL goes to the supplicant's queue.
-6. **ADDBA requests** from the AP are refused (status 37), so it sends single MPDUs.
+6. **Receive aggregation.** The AP's ADDBA request (action frame) is accepted when `AMPDU` allows it, the link is up
+   with HT, the request is for an immediate session of TID 0-7 and a session slot is free (2 slots): the firmware gets
+   a modifying ADD_STA with `add_immediate_ba_tid`, the start sequence number and the window (`rx_ba_window`) so that it
+   answers the AP's aggregates with block acks (`hw_ba_start`; it never waits, because it is made from the receive path:
+   `iwl_cmd_async`), then the ADDBA response goes out (immediate policy, no A-MSDU, our window: at most 32 frames, a
+   power of two). Unicast QoS data of a session TID goes through a reorder buffer (`ba_input` in wlan/sta.c, the
+   algorithm of mac80211's `ieee80211_sta_manage_reorder_buf`; frames are held as Ethernet frames in 2 x 47 KB of DMA
+   memory allocated at the end of the join): in order and nothing held: handed on at once; ahead of a hole: held; beyond
+   the window: the window moves and what falls off is handed on; a duplicate or old frame is dropped. A held frame that
+   has waited 100 ms for the one before it is handed on anyway with everything before it (`sta_rx_tick`, run after
+   every service run). DELBA from the AP ends a session (held frames are handed on first); leaving the link discards
+   them. Control frames (block-ack requests) do not reach the host, so a hole the AP gives up on is closed by the
+   timeout. The reorder logic is tested on the host: `sh tests/ba_reorder/run.sh`.
 7. **leave**: deauthentication, smart FIFO off, quota 0, MAC context unassociated, time event removed, station removed,
    binding removed, MAC context removed, PHY context back to the first channel.
 

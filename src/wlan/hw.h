@@ -45,6 +45,11 @@ int    hw_join_prepare(struct net_s *n);        /* go to the AP's channel, firmw
 int    hw_join_complete(void);                  /* associated: AID, rates, HT from the sta state (g_j*)      */
 void   hw_leave(void);                          /* undo hw_join_prepare / hw_join_complete                   */
 int    hw_mgmt_tx(UCHAR FAR *frame, USHORT len);   /* a complete management frame; 0 = queued                */
+/* Receive aggregation (block-ack sessions): tell the firmware to acknowledge A-MPDUs of this TID, starting at
+ * sequence number ssn with a reorder window of win frames. Neither call waits (they are made from the receive
+ * path); the firmware's answer is only checked afterwards. 0 = queued. */
+int    hw_ba_start(UCHAR tid, USHORT ssn, USHORT win);
+int    hw_ba_stop(UCHAR tid);
 int    hw_key_set(UCHAR FAR *key, USHORT klen, USHORT pairwise, UCHAR idx);   /* CCMP key; 0 = installed */
 int    hw_key_clear(USHORT pairwise, UCHAR idx);
 
