@@ -664,6 +664,10 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
 
    if (len < sizeof(tx_resp_t))
       return;
+   if (p[0] > 1 && iwl_txq_present(QI_AGG) && qid == iwl_txq_qid(QI_AGG)) {
+      txa_tx_resp(qid, p, len);                    /* an A-MPDU: the status field is not a frame's result    */
+      return;
+   }
    st = (USHORT)(get16(p + 36) & TX_STATUS_MSK);
    g_tx_last_st = get16(p + 36);                   /* full status word                                       */
    g_tx_last_fail = p[3];                          /* failure_frame: retries that failed                     */

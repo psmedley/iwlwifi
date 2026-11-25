@@ -177,3 +177,9 @@ Please send the full `copy \DEV\WRND32$ con` output and the COM1 log with any re
 `len - hl + 14 > sizeof(g_eth)` (added with the 802.3 conversion) counted the 8-byte LLC/SNAP header as if it stayed, so
 every full-size frame (1500-byte IP packet = 1522 > 1520) was dropped (`drop[4]` counts these). `g_eth` is now 1600 bytes.
 `AMPDU = 0` and `MAXWIDTH = 20` did not help, which pointed away from aggregation.
+
+**Run 7** (build b38af5b: both aggregations): 2.4 GHz channel 11, HT20 two streams (MCS 15), download about 6.6 MB/s.
+`TXAGG state=ACTIVE`, one session (`started=1 cfgok=1`), 5631 A-MPDUs carrying 20121 frames (about 3.6 per aggregate),
+`queued=0` afterwards, no command or configuration failures. `TXFAIL`/`hist fail` in this run counted every aggregate
+response (its status field is not a frame result): not a real failure, fixed afterwards. `UNHANDLED` (notification with
+code 0, queue 0x80, 4 bytes `01 00 00 00`) still grows with receive traffic; harmless so far.
