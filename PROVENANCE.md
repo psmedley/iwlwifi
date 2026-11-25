@@ -8,6 +8,7 @@
 | Cross-checks: group-key installation, NVM chunk reading with offsets, paging scope, L0s bit, legacy RX crypto (MIC left in place) | Linux `drivers/net/wireless/intel/iwlwifi` (`pcie/trans.c`, `mvm/sta.c`, `mvm/nvm.c`, `mvm/rx.c`, `mvm/fw.c`, `fw/paging.c`, `iwl-drv.c`, `cfg/8000.c`, `pcie/drv.c`) | GPL-2.0 / BSD-3-Clause |
 | PCI ids and family assignments | Linux `pcie/drv.c`, OpenBSD `iwm_attach` | - |
 | Structure sizes asserted in `iwl_cfg.c` | computed by compiling OpenBSD's definitions with gcc | - |
+| `bin/firmware/iwlwifi-9000-pu-b0-jf-b0-46.ucode` | linux-firmware `intel/iwlwifi/iwlwifi-9000-pu-b0-jf-b0-46.ucode` (SHA-256 `9a0c5d938646942f9798e6212579c25771e4bb44301cd409b82abe361ca2c3e0`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
 | `bin/firmware/iwlwifi-8000C-36.ucode` | linux-firmware `intel/iwlwifi/iwlwifi-8000C-36.ucode` (SHA-256 `479931721f5e168d69d67c297c11738acd75da390adb94f96030a1055f4cf57a`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
 
 The combined work is distributed under GPL-2.0-only (`COPYING`); the ISC-licensed iwm parts are compatible with it.

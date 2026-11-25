@@ -74,6 +74,7 @@ static const iwl_dev_t g_devs[] = {
    { 0x24FB, 0xFFFF, &cfg_3168, "Intel(R) Wireless 3168 (not supported yet)" },
    /* 9000 family: not driven yet (multi-queue receive) */
    { 0x2526, 0xFFFF, &cfg_9260, "Intel(R) Wireless-AC 9260 (not supported yet)" },
+   { 0xA370, 0x4030, &cfg_9560, "Intel(R) Wireless-AC 9560 160MHz (not supported yet)" },
    { 0xA370, 0xFFFF, &cfg_9560, "Intel(R) Wireless-AC 9560 / 9560 CNVi (not supported yet)" },   /* Cannon Lake PCH CNVi */
    { 0x9DF0, 0xFFFF, &cfg_9560, "Intel(R) Wireless-AC 9560 CNVi (not supported yet)" },
    { 0x31DC, 0xFFFF, &cfg_9560, "Intel(R) Wireless-AC 9560 CNVi (not supported yet)" },
