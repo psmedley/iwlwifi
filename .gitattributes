@@ -1,0 +1,3 @@
+# OS/2 reads these: REXX and CMD.EXE need CRLF line endings
+install/* text eol=crlf
+src/build.cmd text eol=crlf
