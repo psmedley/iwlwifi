@@ -1,3 +1,4 @@
-# OS/2 reads these: REXX and CMD.EXE need CRLF line endings
-install/* text eol=crlf
-src/build.cmd text eol=crlf
+# OS/2 reads these: REXX and CMD.EXE need CRLF line endings. Stored byte-for-byte (no conversion) so that
+# raw downloads and zip archives have them too.
+install/* -text
+src/build.cmd -text
