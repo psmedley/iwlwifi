@@ -126,6 +126,12 @@ void iwl9_rx_stop(void)
 
 void iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
 {
+   ps("PERSIST hpm="); ph(g_hpm, 8); ps(" wprot="); ph(g_wprot, 8);
+   if (g_fw_error || g_hw_failed) {                          /* secure-boot status of both CPUs, after a failed start  */
+      ps(" SBOOT cpu1="); ph(iwl_prph_rd(0xA01E30UL), 8); ps(" umag1="); ph(iwl_prph_rd(0xA038C0UL), 8);
+      ps(" umag2="); ph(iwl_prph_rd(0xA038C4UL), 8);
+   }
+   nl();
    ps("MQRX rd="); ph(g_mq_rd, 3);
    ps(" wr="); ph(g_mq_wr, 3); ps(" told="); ph(g_mq_wra, 3); ps(" bufs="); ph(g_mq_bufs, 2); ps(" bad="); ph(g_mq_bad, 4);
    nl();

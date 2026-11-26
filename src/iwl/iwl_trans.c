@@ -602,16 +602,36 @@ static void enable_rfkill_int(void)
    set_mask(CSR_INT_BIT_RF_KILL);
 }
 
+/* 9000 family (Linux iwl_trans_pcie_clear_persistence_bit): firmware left running by an earlier driver (Linux on the same
+ * machine without a power cycle) sets a "persistence" bit that makes the boot ROM refuse a new image. HPM_DEBUG bit 12. */
+ULONG g_hpm, g_wprot;
+static void clear_persistence_bit(void)
+{
+   g_hpm = prph_rd_unlocked(0xA03440UL);
+   g_wprot = 0UL;
+   if (g_hpm != 0xA5A5A5A0UL && (g_hpm & 0x1000UL)) {
+      g_wprot = prph_rd_unlocked(0xA04CE0UL);        /* PREG_PRPH_WPROT_9000                                   */
+      if (g_wprot & 0x1000UL)
+         dd_err("cannot clear the persistence bit (write protected)", g_wprot);
+      else
+         prph_wr_unlocked(0xA03440UL, g_hpm & ~0x1000UL);
+   }
+}
+
 int iwl_start_hw(void)
 {
    if (iwl_prepare_card_hw()) {
       dd_err("the adapter did not become ready (owned by the management engine?)", iwl_rd(CSR_HW_IF_CONFIG_REG));
       return -1;
    }
+   if (g_cfg->family == IWL_FAM_9000)
+      clear_persistence_bit();
    iwl_wr(CSR_RESET, CSR_RESET_REG_FLAG_SW_RESET);
    dd_msleep(5);
    if (apm_init())
       return -2;
+   if (g_cfg->family == IWL_FAM_9000)              /* multi-queue receive hardware: interrupts as MSI / legacy (UREG_CHICK) */
+      iwl_prph_wr(0xA05C00UL, 0x01000000UL);       /* UREG_CHICK_MSI_ENABLE                                  */
    g_trans_on = 1;
    enable_rfkill_int();
    iwl_check_rfkill();

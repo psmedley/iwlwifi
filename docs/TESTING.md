@@ -275,3 +275,11 @@ Send the status text as for the 8260. Milestones in order: `READY`; `no ALIVE fr
 **9560, second test (build b1b38ee):** `SVC=0000`, nothing loaded, same failure. Cause: in `iwl_load_ucode` the 9000 family fell into the
 "family not ported" branch (a condition I wrote as `family != 8000`). Fixed; the failure message of a firmware that does not start
 now carries a code (2 = family not driven, 3 = a section did not load, 4 = no ALIVE).
+
+**9560, third test (build 7e7fc42):** the load ran this time (`IRQS=0014`, one interrupt per firmware chunk, `SVC=003D`) and the firmware then
+raised a firmware error before ALIVE (`FWERR=0001`, `ERRTBL=0`; code 4). Two start-up steps of Linux for this family were missing and
+are now in: clearing the "persistence" bit (HPM_DEBUG bit 12, left set by firmware that an earlier driver started: the card had been
+used under Linux without a power cycle) and `UREG_CHICK` = MSI enable (the multi-queue receive hardware must be told it is not
+in MSI-X mode). The status has a `PERSIST hpm= wprot=` line (value of HPM_DEBUG and of the write-protect word at start-up) and, after a
+failed start, `SBOOT cpu1= umag1= umag2=` (secure-boot status words). If it still fails, those three values are the next clue;
+powering the machine off completely (not a reboot) before the test also removes the persistence question.
