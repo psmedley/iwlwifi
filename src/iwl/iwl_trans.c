@@ -851,7 +851,7 @@ int iwl_load_ucode(USHORT type)
    if (g_cfg->family == IWL_FAM_7000) {
       if (load_firmware_7000(type))
          return -3;
-   } else if (g_cfg->family != IWL_FAM_8000)
+   } else if (g_cfg->family != IWL_FAM_8000 && g_cfg->family != IWL_FAM_9000)
       return -2;
    else if (load_firmware_8000(type))             /* 8000 and 9000: the secured CPU1 / CPU2 sections          */
       return -3;

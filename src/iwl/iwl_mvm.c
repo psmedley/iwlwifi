@@ -401,11 +401,12 @@ static void read_hw_rev(void)
 static int run_init_image(void)
 {
    ULONG t0;
+   int   rc;
 
    g_init_complete = g_calib_complete = 0;
    iwl_phydb_reset();
-   if (iwl_load_ucode(UCODE_INIT))
-      return fail("the INIT firmware did not start", (ULONG)g_hw_state);
+   if ((rc = iwl_load_ucode(UCODE_INIT)) != 0)
+      return fail("the INIT firmware did not start (code: 2 family, 3 load, 4 no ALIVE)", (ULONG)(USHORT)(-rc));
    if (iwl_post_alive())
       return fail("post-ALIVE setup failed (INIT)", 0UL);
    step(0x10);
@@ -434,6 +435,7 @@ static int run_init_image(void)
 int hw_up(void)
 {
    USHORT ac;
+   int   rc;
    static const UCHAR fifo[4] = { TX_FIFO_BE, TX_FIFO_BK, TX_FIFO_VI, TX_FIFO_VO };
 
    g_hw_failed = 0;
@@ -472,8 +474,8 @@ int hw_up(void)
    if (iwl_start_hw())
       return fail("the adapter could not be restarted after INIT", iwl_rd(CSR_GP_CNTRL));
    step(0x21);
-   if (iwl_load_ucode(UCODE_REGULAR))
-      return fail("the runtime firmware did not start", (ULONG)g_hw_state);
+   if ((rc = iwl_load_ucode(UCODE_REGULAR)) != 0)
+      return fail("the runtime firmware did not start (code: 2 family, 3 load, 4 no ALIVE)", (ULONG)(USHORT)(-rc));
    if (iwl_post_alive())
       return fail("post-ALIVE setup failed", 0UL);
    step(0x22);

@@ -271,3 +271,7 @@ is read in the old layout (MAC in the HW section, SKU and channels in the SW sec
 (`SCAN_OFFLOAD_REQUEST`), because these firmware files have no UMAC scan.
 Send the status text as for the 8260. Milestones in order: `READY`; `no ALIVE from the firmware`; `the NVM could not be read`
 (the `NVM` line shows what was found); a scan that finds nothing (`SCAN n= done=`); join and data as on the 8260.
+
+**9560, second test (build b1b38ee):** `SVC=0000`, nothing loaded, same failure. Cause: in `iwl_load_ucode` the 9000 family fell into the
+"family not ported" branch (a condition I wrote as `family != 8000`). Fixed; the failure message of a firmware that does not start
+now carries a code (2 = family not driven, 3 = a section did not load, 4 = no ALIVE).
