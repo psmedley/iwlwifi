@@ -128,10 +128,18 @@ void iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), v
 {
    ps("PERSIST hpm="); ph(g_hpm, 8); ps(" wprot="); ph(g_wprot, 8);
    if (g_fw_error || g_hw_failed) {                          /* secure-boot status of both CPUs, after a failed start  */
-      ps(" SBOOT cpu1="); ph(iwl_prph_rd(0xA01E30UL), 8); ps(" umag1="); ph(iwl_prph_rd(0xA038C0UL), 8);
-      ps(" umag2="); ph(iwl_prph_rd(0xA038C4UL), 8);
+      ps(" SBOOT cpu1="); ph(iwl_prph_rd(0xA01E30UL), 8); ps(" cpu2="); ph(iwl_prph_rd(0xA01E34UL), 8);
+      ps(" umag1="); ph(iwl_prph_rd(0xA038C0UL), 8); ps(" umag2="); ph(iwl_prph_rd(0xA038C4UL), 8);
    }
    nl();
+   if (g_fw_error || g_hw_failed) {                          /* did the device consume receive buffers or write anything? */
+      ps("RFH dmacfg="); ph(iwl_prph_rd(RFH_RXF_DMA_CFG), 8); ps(" gen="); ph(iwl_prph_rd(RFH_GEN_CFG), 8);
+      ps(" active="); ph(iwl_prph_rd(RFH_RXF_RXQ_ACTIVE), 8); ps(" frb_w="); ph(iwl_prph_rd(RFH_Q_FRBDCB_WIDX), 4);
+      ps(" frb_r="); ph(iwl_prph_rd(0xA080C0UL), 4); ps(" urb_w="); ph(iwl_prph_rd(RFH_Q_URBDCB_WIDX), 4);
+      ps(" stts="); ph(get32(iwl_rbstat_ptr()), 8); ps(" used0="); ph(get32(DPTR(g_ubd)), 8); nl();
+   }
+   ps("INTCAUSES seen="); ph(g_int_seen, 8); ps(" alive="); ph(g_int_alive, 4); ps(" rx="); ph(g_int_rx, 4);
+   ps(" fhtx="); ph(g_int_fhtx, 4); ps(" other="); ph(g_int_other, 4); nl();
    ps("MQRX rd="); ph(g_mq_rd, 3);
    ps(" wr="); ph(g_mq_wr, 3); ps(" told="); ph(g_mq_wra, 3); ps(" bufs="); ph(g_mq_bufs, 2); ps(" bad="); ph(g_mq_bad, 4);
    nl();

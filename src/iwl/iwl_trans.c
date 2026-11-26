@@ -446,6 +446,8 @@ static void rx_service(void)
 
 /* ---- the service loop: interrupt causes and the receive ring --------------------------------------------- */
 static USHORT g_svc_lock, g_svc_again;
+ULONG  g_int_seen;                              /* OR of every CSR_INT cause seen                           */
+USHORT g_int_alive, g_int_rx, g_int_fhtx, g_int_other;
 
 static void service_once(void)
 {
@@ -458,6 +460,11 @@ static void service_once(void)
    if (r1 | r2) {
       iwl_wr(CSR_INT, r1);
       iwl_wr(CSR_FH_INT_STATUS, r2);
+      g_int_seen |= r1;
+      if (r1 & CSR_INT_BIT_ALIVE) g_int_alive++;
+      if (r1 & CSR_INT_BIT_FH_RX) g_int_rx++;
+      if (r1 & CSR_INT_BIT_FH_TX) g_int_fhtx++;
+      if (!(r1 & (CSR_INT_BIT_ALIVE | CSR_INT_BIT_FH_RX | CSR_INT_BIT_FH_TX))) g_int_other++;
       if (r1 & CSR_INT_BIT_SW_ERR) {
          g_fw_error++;
          dd_err("firmware error (SW_ERR), error table at", g_err_table);

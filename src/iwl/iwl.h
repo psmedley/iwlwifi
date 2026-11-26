@@ -885,6 +885,8 @@ void   rs_ba(UCHAR txed, UCHAR done);
 void   rs_tick(void);
 void   rs_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
 /* 9000 family (iwl_ctxt.c) and the hooks it needs in iwl_trans.c */
+extern ULONG g_int_seen;
+extern USHORT g_int_alive, g_int_rx, g_int_fhtx, g_int_other;
 extern ULONG g_hpm, g_wprot;                    /* 9000: HPM_DEBUG and the write-protect word at start-up    */
 int    iwl9_alloc(void);
 void   iwl9_reset(void);

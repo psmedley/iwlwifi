@@ -283,3 +283,9 @@ used under Linux without a power cycle) and `UREG_CHICK` = MSI enable (the multi
 in MSI-X mode). The status has a `PERSIST hpm= wprot=` line (value of HPM_DEBUG and of the write-protect word at start-up) and, after a
 failed start, `SBOOT cpu1= umag1= umag2=` (secure-boot status words). If it still fails, those three values are the next clue;
 powering the machine off completely (not a reboot) before the test also removes the persistence question.
+
+**9560, fourth test (build 891b1a4, after a full power-off):** `PERSIST hpm=0 wprot=0` (so the persistence bit was not the problem), no firmware
+error this time, 21 interrupts (about 20 firmware chunks plus one), `ALIVE=00`, `SBOOT cpu1=00000003`, `RXPKT=0`: the firmware loads and then
+never announces itself. New diagnostics: `INTCAUSES` (which interrupt causes were seen: ALIVE, receive, firmware-load), `SBOOT cpu2=`
+(the 9000 family's secure-boot registers are the CPU1/CPU2 pair at 0xA01E30/34; the `umag` ones are 22000-family), and an `RFH` line after
+a failed start (receive-DMA configuration read back, whether the device took any receive buffers: `frb_r`, `urb_w`, `stts`, `used0`).
