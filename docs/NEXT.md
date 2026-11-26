@@ -34,3 +34,11 @@ Until stage 1 exists the device table lists the IDs as "not supported yet" and t
 
 9560 identification (Linux 5.4+ on the author's machine, `8086:A370` subsystem `8086:4030`, rev 10): firmware 46.7e3e4b69.0
 (`iwlwifi-9000-pu-b0-jf-b0-46.ucode`), `crf-id 0x2816`, `cnv-id 0x1000100`, `wfpm id 0x80000000`.
+
+## AX210 (22000 "So" generation) - testers available
+
+The author's laptop and an OS2World user both have an Intel AX210 (and a second machine has an AX211 / Alder Lake CNVi `8086:51F0`).
+That makes this family testable. It needs a separate transport (Linux `pcie/ctxt-info-gen3.c`, `trans-gen2.c`, `tx-gen2.c`,
+`rx.c` with `iwl_rx_transfer_desc`), the gen2 TFD format, a newer firmware API, and a decision on how much of 802.11ax and 6 GHz to
+support (a plain HT/VHT link first). Order of work: the 9560 (in progress), then this. Details to collect from the testers first:
+`lspci -nnv` (device and subsystem id), `dmesg | grep iwlwifi` (firmware file and version), and the firmware file itself.
