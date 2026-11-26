@@ -289,3 +289,9 @@ error this time, 21 interrupts (about 20 firmware chunks plus one), `ALIVE=00`, 
 never announces itself. New diagnostics: `INTCAUSES` (which interrupt causes were seen: ALIVE, receive, firmware-load), `SBOOT cpu2=`
 (the 9000 family's secure-boot registers are the CPU1/CPU2 pair at 0xA01E30/34; the `umag` ones are 22000-family), and an `RFH` line after
 a failed start (receive-DMA configuration read back, whether the device took any receive buffers: `frb_r`, `urb_w`, `stts`, `used0`).
+
+**9560, fifth test (build 9ae5ece):** `INTCAUSES seen=08000001 alive=0001 rx=0000 fhtx=0014`: the firmware **did start** (the ALIVE interrupt came after the
+20 chunk interrupts) but its ALIVE message never arrived through the receive rings. The receive hardware reads back as programmed
+(`RFH dmacfg=87940000 gen=00000013 active=00010001`), the device fetched 32 free buffers (`frb_r=0020`), and wrote nothing
+(`urb_w=0`, `stts=0`, `used0=0`). `SBOOT cpu1=00000003 cpu2=000300E2`. Next diagnostics: `RXBUF0/1` (the first bytes of two receive buffers, zeroed at
+start: any DMA write by the device shows), `RFHREGS` (the ring addresses read back against what was meant), `CHICK DRV_GP1 DRV_GP2 MBOX FHINT`.

@@ -64,6 +64,12 @@ void iwl9_rx_init(void)
       put32(d + i * 8, iwl_rxbuf_phys(i) | (ULONG)(i + 1));
       put32(d + i * 8 + 4, 0UL);
    }
+   for (i = 0; i < 4; i++) {                               /* the first buffers zeroed: any DMA write into them shows in the status */
+      USHORT sel = scr_map(SCR_C, iwl_rxbuf_phys(i), 4096);
+
+      if (sel)
+         fmemset((UCHAR FAR *)MAKEP(sel, 0), 0, 4096);
+   }
    g_mq_wr = RX_NBUF;
    g_mq_wra = RX_NBUF;
    g_mq_bufs = RX_NBUF;
@@ -126,6 +132,8 @@ void iwl9_rx_stop(void)
 
 void iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
 {
+   USHORT i;
+
    ps("PERSIST hpm="); ph(g_hpm, 8); ps(" wprot="); ph(g_wprot, 8);
    if (g_fw_error || g_hw_failed) {                          /* secure-boot status of both CPUs, after a failed start  */
       ps(" SBOOT cpu1="); ph(iwl_prph_rd(0xA01E30UL), 8); ps(" cpu2="); ph(iwl_prph_rd(0xA01E34UL), 8);
@@ -137,6 +145,22 @@ void iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), v
       ps(" active="); ph(iwl_prph_rd(RFH_RXF_RXQ_ACTIVE), 8); ps(" frb_w="); ph(iwl_prph_rd(RFH_Q_FRBDCB_WIDX), 4);
       ps(" frb_r="); ph(iwl_prph_rd(0xA080C0UL), 4); ps(" urb_w="); ph(iwl_prph_rd(RFH_Q_URBDCB_WIDX), 4);
       ps(" stts="); ph(get32(iwl_rbstat_ptr()), 8); ps(" used0="); ph(get32(DPTR(g_ubd)), 8); nl();
+      ps("CHICK="); ph(iwl_prph_rd(0xA05C00UL), 8); ps(" DRV_GP1="); ph(iwl_rd(0x054), 8); ps(" DRV_GP2="); ph(iwl_rd(0x060), 8);
+      ps(" MBOX="); ph(iwl_rd(0x088), 8); ps(" FHINT="); ph(iwl_rd(0x010), 8); nl();
+      ps("RFHREGS fbd="); ph(iwl_prph_rd(RFH_Q_FRBDCB_BA_LSB), 8); ps(" ubd="); ph(iwl_prph_rd(RFH_Q_URBDCB_BA_LSB), 8);
+      ps(" stts="); ph(iwl_prph_rd(RFH_Q_URBD_STTS_WPTR), 8); ps(" want fbd="); ph(g_fbd.phys, 8); ps(" ubd="); ph(g_ubd.phys, 8);
+      ps(" stts="); ph(iwl_rbstat_phys(), 8); nl();
+      for (i = 0; i < 2; i++) {                             /* the first bytes of two receive buffers: did the device write anything? */
+         USHORT sel = scr_map(SCR_C, iwl_rxbuf_phys(i), 64);
+         UCHAR FAR *p = (UCHAR FAR *)MAKEP(sel, 0);
+         USHORT k;
+
+         ps("RXBUF"); ph(i, 1); ps(" ");
+         if (!sel) { ps("unmapped"); nl(); continue; }
+         for (k = 0; k < 24; k++)
+            ph(p[k], 2);
+         nl();
+      }
    }
    ps("INTCAUSES seen="); ph(g_int_seen, 8); ps(" alive="); ph(g_int_alive, 4); ps(" rx="); ph(g_int_rx, 4);
    ps(" fhtx="); ph(g_int_fhtx, 4); ps(" other="); ph(g_int_other, 4); nl();
