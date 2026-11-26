@@ -246,20 +246,20 @@ build was not the one running): download about 10 MB/s (11-12 at times), upload 
 with power save off. `POWER save=1`, no firmware errors, aggregation and rate adaptation as before (upload settled at
 `rung=03/10 first=...F016`, two streams MCS 6).
 
-## 6. Intel Wireless-AC 9560 (9000 family), stage 1
+## 6. Intel Wireless-AC 9560 (9000 family)
 
-First build for the 9560 (`8086:A370`, subsystem `4030`). The status shows `ADAPTER=Intel(R) Wireless-AC 9560 160MHz (experimental)`
-and the firmware to copy is `bin\firmware\iwlwifi-9000-pu-b0-jf-b0-46.ucode` (same `copy /b ... \DEV\WRND32$` line as for the
-8260; the driver and `IWLWIFI.NIF` are the same files). The firmware is loaded by the card's own boot ROM from memory the driver
-prepares (context information), and receive uses two rings (multi-queue receive).
+`8086:A370`, subsystem `4030`. Copy `bin\firmware\iwlwifi-9000-pu-b0-jf-b0-46.ucode` instead of the 8260 file (same `copy /b ...
+\DEV\WRND32$` line; same driver and `IWLWIFI.NIF`). The firmware is loaded like the 8000 family's (service channel, secured CPU1 /
+CPU2 sections); receive uses two rings (multi-queue receive, `MQRX` status line).
 
-What to send back (the status text, as for the 8260): where it stopped, i.e. the `STATE=` value, the `LASTERR=` line, and the new
-lines `CTXINFO lmac= umac= paging= dram= fail= MQRX rd= wr= told= bufs= bad=` (sections found in the firmware, bytes copied into
-memory, the receive rings) and `SVC= RXPKT=` (whether anything arrived), `ALIVE=`, `CSR_INT=`, `CMDS=`.
-Milestones, in order: `READY` (everything worked), `no ALIVE from the firmware` (the ROM did not start the image: context info
-or interrupt problem), `the NVM could not be read` (firmware runs, INIT works), later steps as on the 8260. A hang or a restart
-of the machine is also a result: say at which message on screen it happened.
-Not tried yet on this card: scan, join, data (stages 2 to 4 in docs/NEXT.md).
+**First test (build e3c2af8, context-info boot):** the card was found (`ID=8086:A370 SUB=8086:4030`, IRQ 13, `BAR0=91234000`), the
+firmware file arrived (`LEN=00172FD0`), the INIT image was split into 9 sections (548,520 bytes copied into memory), 64 receive
+buffers were posted, and then nothing: `RXPKT=0`, `ALIVE=00`, `CSR_INT=0`, `the INIT firmware did not start`. The cause was my
+reading of Linux: the context-info boot (`ctxt-info.c`) belongs to the 22000 family; the 9000 family loads its firmware through the
+service channel like the 8000 (`iwl_pcie_load_given_ucode_8000`). The boot was replaced by the 8000-style load; only the
+multi-queue receive stays.
+
+What to send back: the status text; milestones `READY`, `no ALIVE from the firmware`, `the NVM could not be read`, later steps as on the 8260.
 
 ## 7. Intel Wireless 7265 / 3165 (7000 family), first build
 

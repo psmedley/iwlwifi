@@ -25,9 +25,8 @@ The 9560 on the author's second machine is `8086:A370` (Cannon Lake PCH CNVi). L
 `iwlwifi-9000-pu-b0-jf-b0-46.ucode` (version 46, 1,519,568 bytes; SHA-256 9a0c5d93...c3e0), to be confirmed from
 `dmesg | grep iwlwifi` on Linux (which file it loads, the hardware revision). What differs from the 8000 family, using
 Linux 5.4 `pcie/ctxt-info.c`, `pcie/rx.c`, `pcie/trans.c` as the reference:
-1. Stage 1, boot: firmware loaded through the context-info structure (firmware sections placed in DRAM, an image-loader
-   TLV, the card started through CSR/RFH registers), multi-queue receive (RFH registers, "used" and "free" rings), CNVi reset
-   sequence. Goal: `STATE=READY`, firmware version in the status.
+1. Stage 1, boot: firmware loaded like the 8000 family (service channel, secured sections; the first test showed that the
+   context-info boot is the 22000 family's), multi-queue receive (RFH registers, "used" and "free" rings). Goal: `STATE=READY`.
 2. Stage 2, scan: command formats of the 9000 firmware (PHY context, scan, TX flags).
 3. Stage 3, join (WPA2): station layer unchanged.
 4. Stage 4, speed: aggregation, VHT, rate adaptation, with the multi-queue receive path.

@@ -215,7 +215,7 @@ static int setup_paging(void)
    USHORT  sec, i, pages;
    ULONG   off = 0;
 
-   if (!im->paging_size || g_cfg->family == IWL_FAM_9000)   /* 9000: the paging memory went in with the context info */
+   if (!im->paging_size)
       return 0;
    for (sec = 0; sec < im->nsec; sec++)
       if (im->sec[sec].devoff == PAGING_SEPARATOR_SECTION)

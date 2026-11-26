@@ -644,10 +644,8 @@ void iwl_stop_device(void)
       }
       iwl_nic_unlock();
    }
-   if (g_cfg->family == IWL_FAM_9000) {
+   if (g_cfg->family == IWL_FAM_9000)
       iwl9_rx_stop();
-      iwl9_free_all();
-   }
    reset_rings();
    if (g_cfg->family == IWL_FAM_7000) {
       iwl_prph_wr(0x3008UL, 0x00000200UL);       /* APMG_CLK_DIS_REG: DMA clock off                        */
@@ -850,22 +848,17 @@ int iwl_load_ucode(USHORT type)
    set_mask(CSR_INT_BIT_FH_TX);                   /* only the chunk-done interrupt while loading           */
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
-   if (g_cfg->family == IWL_FAM_9000) {           /* the context-info boot                                   */
-      if (iwl9_boot(type))
-         return -5;
-   } else if (g_cfg->family == IWL_FAM_7000) {
+   if (g_cfg->family == IWL_FAM_7000) {
       if (load_firmware_7000(type))
          return -3;
    } else if (g_cfg->family != IWL_FAM_8000)
       return -2;
-   else if (load_firmware_8000(type))
+   else if (load_firmware_8000(type))             /* 8000 and 9000: the secured CPU1 / CPU2 sections          */
       return -3;
    if (hw_wait(&g_alive, 1000) || !g_alive_ok) {
       dd_err(g_alive ? "firmware ALIVE with bad status" : "no ALIVE from the firmware", iwl_rd(CSR_INT));
       return -4;
    }
-   if (g_cfg->family == IWL_FAM_9000)
-      iwl9_free_images();                         /* the device has its copy of the firmware; paging stays     */
    return 0;
 }
 
