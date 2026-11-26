@@ -318,6 +318,10 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
           ((missed_beacons_notif_t FAR *)p)->consec_missed_beacons_since_last_rx > 24UL)
          sta_lost();                               /* about 2.5 s without a beacon from the AP               */
       break;
+   case CMD_SCAN_OFFLOAD_COMPLETE:
+   case CMD_SCAN_ITERATION_COMPLETE:
+      iwl_scan_done();                            /* LMAC scan                                              */
+      break;
    case WIDE_ID(0, CMD_SCAN_COMPLETE_UMAC):
    case WIDE_ID(0, CMD_SCAN_ITERATION_COMPLETE_UMAC):
    case WIDE_ID(LONG_GROUP, CMD_SCAN_COMPLETE_UMAC):
@@ -502,9 +506,7 @@ int hw_up(void)
    step(0x26);
    if (FW_CAPA(CAPA_LAR_SUPPORT) && send_mcc())
       tstr("[iwl: MCC update refused]");
-   if (!FW_CAPA(CAPA_UMAC_SCAN))
-      return fail("this firmware has no UMAC scan; the LMAC scan is not implemented", 0UL);
-   if (iwl_scan_config())
+   if (FW_CAPA(CAPA_UMAC_SCAN) && iwl_scan_config())   /* the LMAC scan (7000 family) needs no configuration */
       return fail("scan configuration failed", 0UL);
    step(0x27);
    for (ac = 0; ac < 4; ac++)

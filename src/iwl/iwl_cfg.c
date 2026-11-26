@@ -50,7 +50,7 @@ static const iwl_cfg_t cfg_8260 = { IWL_FAM_8000, IWL_NVM_EXT, 0, 1, 32768U, "iw
 static const iwl_cfg_t cfg_8265 = { IWL_FAM_8000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-8265-36.ucode" };
 static const iwl_cfg_t cfg_7260 = { IWL_FAM_7000, IWL_NVM,     1, 0, 16384U, "iwlwifi-7260-17.ucode" };
 static const iwl_cfg_t cfg_3160 = { IWL_FAM_7000, IWL_NVM,     1, 0, 16384U, "iwlwifi-3160-17.ucode" };
-static const iwl_cfg_t cfg_7265 = { IWL_FAM_7000, IWL_NVM,     0, 0, 16384U, "iwlwifi-7265D-29.ucode" };
+static const iwl_cfg_t cfg_7265 = { IWL_FAM_7000, IWL_NVM,     0, 1, 16384U, "iwlwifi-7265D-29.ucode" };
 static const iwl_cfg_t cfg_3168 = { IWL_FAM_7000, IWL_NVM_SDP, 0, 0, 16384U, "iwlwifi-3168-29.ucode" };
 static const iwl_cfg_t cfg_9560 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode" };   /* CNVi, "Jefferson Peak" radio */
 static const iwl_cfg_t cfg_9560_x = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode" };
@@ -68,10 +68,10 @@ static const iwl_dev_t g_devs[] = {
    { 0x08B2, 0xFFFF, &cfg_7260, "Intel(R) Wireless-N/AC 7260 (not supported yet)" },
    { 0x08B3, 0xFFFF, &cfg_3160, "Intel(R) Wireless 3160 (not supported yet)" },
    { 0x08B4, 0xFFFF, &cfg_3160, "Intel(R) Wireless 3160 (not supported yet)" },
-   { 0x095A, 0xFFFF, &cfg_7265, "Intel(R) Wireless 7265 (not supported yet)" },
-   { 0x095B, 0xFFFF, &cfg_7265, "Intel(R) Wireless 7265 (not supported yet)" },
-   { 0x3165, 0xFFFF, &cfg_7265, "Intel(R) Wireless 3165 (not supported yet)" },
-   { 0x3166, 0xFFFF, &cfg_7265, "Intel(R) Wireless 3165 (not supported yet)" },
+   { 0x095A, 0xFFFF, &cfg_7265, "Intel(R) Wireless 7265 (experimental)" },
+   { 0x095B, 0xFFFF, &cfg_7265, "Intel(R) Wireless 7265 (experimental)" },
+   { 0x3165, 0xFFFF, &cfg_7265, "Intel(R) Wireless 3165 (experimental)" },
+   { 0x3166, 0xFFFF, &cfg_7265, "Intel(R) Wireless 3165 (experimental)" },
    { 0x24FB, 0xFFFF, &cfg_3168, "Intel(R) Wireless 3168 (not supported yet)" },
    /* 9000 family: not driven yet (multi-queue receive) */
    { 0x2526, 0xFFFF, &cfg_9260, "Intel(R) Wireless-AC 9260 (not supported yet)" },

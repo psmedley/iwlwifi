@@ -260,3 +260,14 @@ Milestones, in order: `READY` (everything worked), `no ALIVE from the firmware` 
 or interrupt problem), `the NVM could not be read` (firmware runs, INIT works), later steps as on the 8260. A hang or a restart
 of the machine is also a result: say at which message on screen it happened.
 Not tried yet on this card: scan, join, data (stages 2 to 4 in docs/NEXT.md).
+
+## 7. Intel Wireless 7265 / 3165 (7000 family), first build
+
+For `8086:095A` / `095B` (7265) and `3165` / `3166` (3165). Copy the firmware for your card's step: `iwlwifi-7265D-29.ucode` for
+the D step (most 7265 and all 3165 cards; Linux prints `loaded firmware version 29...` for them) or `iwlwifi-7265-17.ucode` for
+an older B/C step, using the usual `copy /b ... \DEV\WRND32$` line. What is new for this family: the firmware sections are
+pushed through the service channel without the 8000's secure-boot handshake (the CPU is released with `CSR_RESET = 0`), the NVM
+is read in the old layout (MAC in the HW section, SKU and channels in the SW section) and scanning uses the LMAC scan
+(`SCAN_OFFLOAD_REQUEST`), because these firmware files have no UMAC scan.
+Send the status text as for the 8260. Milestones in order: `READY`; `no ALIVE from the firmware`; `the NVM could not be read`
+(the `NVM` line shows what was found); a scan that finds nothing (`SCAN n= done=`); join and data as on the 8260.

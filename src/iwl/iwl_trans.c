@@ -815,6 +815,26 @@ static int load_firmware_8000(USHORT type)
    return 0;
 }
 
+/* iwm_load_firmware_7000: the sections of the first CPU in order (to the separator), then CSR_RESET = 0 starts it */
+static int load_firmware_7000(USHORT type)
+{
+   fwimg_t *im = &g_fw.img[type];
+   USHORT i;
+
+   for (i = 0; i < im->nsec; i++) {
+      if (im->sec[i].devoff == CPU1_CPU2_SEPARATOR_SECTION || im->sec[i].devoff == PAGING_SEPARATOR_SECTION)
+         break;                                   /* (a second CPU, as in the 3160, would continue after it) */
+      if (load_section(&im->sec[i])) {
+         dd_err("firmware section not loaded", (ULONG)i);
+         return -1;
+      }
+   }
+   set_mask(CSR_INI_SET_MASK);
+   g_intmask_on = 1;
+   iwl_wr(CSR_RESET, 0UL);
+   return 0;
+}
+
 int iwl_load_ucode(USHORT type)
 {
    g_alive = g_alive_ok = 0;
@@ -833,7 +853,10 @@ int iwl_load_ucode(USHORT type)
    if (g_cfg->family == IWL_FAM_9000) {           /* the context-info boot                                   */
       if (iwl9_boot(type))
          return -5;
-   } else if (g_cfg->family != IWL_FAM_8000)      /* 7000 (no CPU2, no secure load) is not ported            */
+   } else if (g_cfg->family == IWL_FAM_7000) {
+      if (load_firmware_7000(type))
+         return -3;
+   } else if (g_cfg->family != IWL_FAM_8000)
       return -2;
    else if (load_firmware_8000(type))
       return -3;

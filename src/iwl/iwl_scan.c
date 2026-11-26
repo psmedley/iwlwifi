@@ -105,6 +105,76 @@ static void fill_preq(UCHAR FAR *pr, USHORT nbands)
    put16(pr + 4 + nbands * 4 + 2, (USHORT)(k - s));
 }
 
+/* LMAC scan (iwm_lmac_scan): SCAN_OFFLOAD_REQUEST_CMD, one active scan with the wildcard SSID on every channel the NVM allows.
+ * Layout checked with gcc (struct iwm_scan_req_lmac, 764 bytes + channel configurations of 12 bytes + a v1 probe request). */
+static int hw_scan_lmac(void)
+{
+   UCHAR FAR *r, FAR *d;
+   USHORT n, i, rxc;
+   ULONG  t0, sf, ant;
+   USHORT len;
+
+   if (buf())
+      return -2;
+   r = DPTR(g_sbuf);
+   n = (g_nvm_nchan < g_fw.n_scan_channels) ? g_nvm_nchan : g_fw.n_scan_channels;
+   len = (USHORT)(SCAN_REQ_LMAC_SIZE + 12 * g_fw.n_scan_channels + 528);
+   if (len > 2048)
+      return -3;
+   r[4] = (UCHAR)n;                                /* n_channels                                            */
+   r[5] = 10;                                      /* active dwell                                          */
+   r[6] = 110;                                     /* passive                                               */
+   r[7] = 44;                                      /* fragmented                                            */
+   r[8] = 90;                                      /* extended                                              */
+   rxc = (USHORT)iwl_valid_rx_ant();
+   put16(r + 10, (USHORT)((rxc << PHY_RX_CHAIN_VALID_POS) | (rxc << PHY_RX_CHAIN_FORCE_MIMO_SEL_POS) |
+                          (rxc << PHY_RX_CHAIN_FORCE_SEL_POS) | (1U << PHY_RX_CHAIN_DRIVER_FORCE_POS)));
+   sf = LMAC_SCAN_FLAG_PASS_ALL | LMAC_SCAN_FLAG_ITER_COMPLETE | LMAC_SCAN_FLAG_EXTENDED_DWELL;
+   if (FW_CAPA(CAPA_DS_PARAM_SET_IE_SUPPORT) && FW_CAPA(CAPA_WFA_TPC_REP_IE_SUPPORT))
+      sf |= LMAC_SCAN_FLAGS_RRM_ENABLED;
+   put32(r + 12, sf);
+   put32(r + 24, 1UL);                             /* RX on flags: band 2.4 GHz (5 GHz is value 0 too)       */
+   put32(r + 28, MAC_FILTER_ACCEPT_GRP | MAC_FILTER_IN_BEACON);
+   ant = (ULONG)iwl_valid_tx_ant();
+   ant = (ant & 1UL) ? 0x4000UL : ((ant & 2UL) ? 0x8000UL : 0x4000UL);   /* RATE_MCS_ANT_A / B               */
+   for (i = 0; i < 2; i++) {                       /* tx_cmd[0] 2.4 GHz, [1] 5 GHz: 6 Mbit/s OFDM            */
+      put32(r + 32 + i * 12, TX_CMD_FLG_SEQ_CTL | TX_CMD_FLG_BT_DIS);
+      put32(r + 36 + i * 12, 13UL | ant);
+      r[40 + i * 12] = AUX_STA_ID;
+   }
+   r[56] = 0;                                      /* direct_scan[0]: the wildcard SSID (element 0, length 0) */
+   r[57] = 0;
+   put32(r + 736, SCAN_PRIORITY_HIGH);
+   put32(r + 740, 1UL);                            /* iter_num                                              */
+   r[748 + 2] = 1;                                 /* schedule[0]: one iteration                             */
+   r[748 + 3] = 1;
+   r[756 + 2] = 1;                                 /* channel_opt: EBS disabled                             */
+   r[760 + 2] = 1;
+   d = r + SCAN_REQ_LMAC_SIZE;
+   for (i = 0; i < n; i++) {
+      put32(d + i * 12, UNIFIED_SCAN_CHANNEL_PARTIAL | 2UL);   /* partial, select SSID 0                       */
+      put16(d + i * 12 + 4, g_nvm_chan[i]);
+      put16(d + i * 12 + 6, 1);                    /* iter_count                                            */
+   }
+   fill_preq(d + 12 * g_fw.n_scan_channels, 2);    /* the v1 probe request: two band segments                */
+   g_scan_done = 0;
+   sta_age();
+   if (iwl_cmd1(CMD_SCAN_OFFLOAD_REQUEST, r, len))
+      return -4;
+   g_scan_n++;
+   t0 = dd_ms();
+   while (!g_scan_done) {
+      hw_wait(&g_scan_done, 200);
+      if (g_fw_error)
+         return -5;
+      if ((long)(dd_ms() - t0) > 12000L) {
+         iwl_cmd1(CMD_SCAN_OFFLOAD_ABORT, (UCHAR FAR *)0, 0);
+         return -6;
+      }
+   }
+   return 0;
+}
+
 int hw_scan(void)
 {
    UCHAR FAR *r, FAR *d, FAR *tail;
@@ -114,6 +184,8 @@ int hw_scan(void)
 
    if (!g_hw_ready)
       return -1;
+   if (!FW_CAPA(CAPA_UMAC_SCAN))
+      return hw_scan_lmac();
    if (buf())
       return -2;
    r = DPTR(g_sbuf);

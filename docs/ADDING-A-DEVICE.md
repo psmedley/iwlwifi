@@ -22,7 +22,9 @@ Add a line to `g_devs[]` in `iwl/iwl_cfg.c`:
 
 ## 7000 family (7260, 3160, 7265, 3165, 3168)
 
-Listed in `g_devs[]` with `supported = 0`. What is missing (all in iwm, `sc_device_family == IWM_DEVICE_FAMILY_7000`):
+**7265 / 3165 (`095A`, `095B`, `3165`, `3166`): written, awaiting hardware results** (firmware load without secure sections,
+the 7000 NVM layout, the LMAC scan). The 7260, 3160 and 3168 are still `supported = 0` (the code below applies to them
+too, but they have not been tried). The original list of what a 7000 part needs (all in iwm, `sc_device_family == IWM_DEVICE_FAMILY_7000`):
 
 1. **Firmware download** without the secure CPU1/CPU2 protocol: `iwm_load_firmware_7000` (each section with
    `iwm_firmware_load_sect`, then `CSR_RESET = 0` to start the CPU). `iwl_load_ucode()` returns -2 for it now.

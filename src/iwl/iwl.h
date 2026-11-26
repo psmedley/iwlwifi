@@ -358,6 +358,16 @@ extern fwinfo_t g_fw;
 #define CMD_REPLY_ERROR         0x02
 #define CMD_INIT_COMPLETE_NOTIF 0x04
 #define CMD_PHY_CONTEXT         0x08
+#define CMD_SCAN_OFFLOAD_REQUEST 0x51           /* LMAC scan (firmware without UMAC scan: 7000 family)    */
+#define CMD_SCAN_OFFLOAD_ABORT  0x52
+#define CMD_SCAN_OFFLOAD_COMPLETE 0x6D
+#define CMD_SCAN_ITERATION_COMPLETE 0xE7
+#define SCAN_REQ_LMAC_SIZE      764
+#define LMAC_SCAN_FLAG_PASS_ALL   0x01UL
+#define LMAC_SCAN_FLAG_ITER_COMPLETE 0x08UL
+#define LMAC_SCAN_FLAGS_RRM_ENABLED 0x40UL
+#define LMAC_SCAN_FLAG_EXTENDED_DWELL 0x80UL
+#define UNIFIED_SCAN_CHANNEL_PARTIAL 0x10000000UL
 #define CMD_SCAN_CFG            0x0C            /* LONG_GROUP                                             */
 #define CMD_SCAN_REQ_UMAC       0x0D            /* LONG_GROUP                                             */
 #define CMD_SCAN_ABORT_UMAC     0x0E            /* LONG_GROUP                                             */

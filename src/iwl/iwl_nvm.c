@@ -30,6 +30,13 @@ static const UCHAR g_chan8000[51] = {
    149, 153, 157, 161, 165, 169, 173, 177, 181
 };
 
+static const UCHAR g_chan7000[39] = {
+   1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+   36, 40, 44, 48, 52, 56, 60, 64,
+   100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144,
+   149, 153, 157, 161, 165
+};
+
 static DMA    g_buf;
 static USHORT g_buf_ok;
 
@@ -102,6 +109,59 @@ int hw_chan_ht40(UCHAR ch)
    return 0;
 }
 
+/* The 7000 family (iwm_parse_nvm_data, device family 7000): the MAC address in the HW section (word 0x15, bytes swapped
+ * in pairs); version, radio configuration and SKU in the SW section (words 0, 1, 2); the channel flags in the SW
+ * section from word 0x20 (the 3168: the regulatory section 8). The antennas come from the firmware's PHY SKU. */
+static int nvm_init_7000(void)
+{
+   static UCHAR mac[6];
+   UCHAR FAR *b = DPTR(g_buf);
+   long  len;
+   ULONG sku;
+   USHORT i, w0;
+
+   len = read_section(0);                          /* NVM_SECTION_TYPE_HW                                     */
+   if (len < 0x2A + 6)
+      return -2;
+   for (i = 0; i < 6; i += 2) {                    /* "214365": little-endian 16-bit words                    */
+      mac[i] = b[0x2A + i + 1];
+      mac[i + 1] = b[0x2A + i];
+   }
+   len = read_section(NVM_SECTION_SW);
+   if (len < 8)
+      return -3;
+   g_nvm_version = get16(b);
+   sku = get16(b + 4);
+   g_nvm_tx_ant = g_nvm_rx_ant = 0;                /* unknown: the firmware's PHY SKU decides                 */
+   g_nvm_lar = 0;
+   g_nvm_5ghz = (UCHAR)((sku & 0x02UL) != 0);
+   g_nvm_11n  = (UCHAR)((sku & 0x04UL) != 0);
+   g_nvm_11ac = (UCHAR)((sku & 0x08UL) != 0);
+   w0 = 0x20;
+   if (g_cfg->nvm_type == IWL_NVM_SDP) {           /* the 3168: channel flags in the regulatory section       */
+      len = read_section(8);
+      if (len < 78)
+         return -4;
+      w0 = 0;
+   } else if (len < (long)((0x20 + 39) * 2))
+      return -4;
+   g_nvm_nchan = 0;
+   for (i = 0; i < 39; i++) {
+      USHORT f = get16(b + (w0 + i) * 2);
+
+      if (!(f & 0x0001))
+         continue;
+      if (i >= 14 && !g_nvm_5ghz)
+         continue;
+      g_nvm_flags[g_nvm_nchan] = f;
+      g_nvm_chan[g_nvm_nchan++] = g_chan7000[i];
+   }
+   fmemcpy((UCHAR FAR *)g_hw_mac, (UCHAR FAR *)mac, 6);
+   if (!valid_mac((UCHAR FAR *)g_hw_mac))
+      dd_err("the NVM holds no valid MAC address; set NETADDRESS in PROTOCOL.INI", 0UL);
+   return 0;
+}
+
 int iwl_nvm_init(void)
 {
    static UCHAR mac_ovr[6];
@@ -111,7 +171,7 @@ int iwl_nvm_init(void)
    USHORT have_hw, have_mao = 0, i, lar_off;
    U32   u;
 
-   if (g_cfg->family < IWL_FAM_8000)              /* the 7000 layout (SW section MAC, channels) is not ported */
+   if (g_cfg->family < IWL_FAM_7000)
       return -1;
    if (!g_buf_ok) {
       if (dma_get(NVM_KEEP, &g_buf))
@@ -119,6 +179,8 @@ int iwl_nvm_init(void)
       g_buf_ok = 1;
    }
    b = DPTR(g_buf);
+   if (g_cfg->family == IWL_FAM_7000)
+      return nvm_init_7000();
 
    have_hw = (USHORT)(read_section(NVM_SECTION_HW_8000) > 0);
    if (read_section(NVM_SECTION_MAC_OVERRIDE) >= 8) {
