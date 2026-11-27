@@ -536,7 +536,7 @@ int hw_up(void)
       if (send_bt_init())
          tstr("[iwl: BT coexistence command refused]");
       step(0x35);
-      if (add_aux_sta())
+      if (0 && add_aux_sta())                         /* iwx scans without an auxiliary station; its queue command crashes fw 50 */
          return fail("AX200 stage 4: the auxiliary station or its queue could not be created", (ULONG)g_q22_fail);
       step(0x36);
       if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
