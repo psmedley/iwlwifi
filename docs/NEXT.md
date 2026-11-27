@@ -46,3 +46,19 @@ support (a plain HT/VHT link first). Order of work: the 9560 (in progress), then
 AX200 on the author's laptop (Dell XPS 13 7390, `8086:2723` rev 1a, subsystem `1a56:1653` Killer AX1650): Linux loads `iwlwifi-cc-a0-77.ucode`
 (version 77.8dbafb52.0; the file is 1,368,100 bytes with 50 runtime sections, no separate INIT image: a "unified" firmware, which
 confirms that the 22000 generation starts its NVM/INIT phase inside the runtime image, as Linux `iwl_run_unified_mvm_ucode` does).
+
+### AX200 (Killer AX1650w, `8086:2723` subsystem `1a56:1653`): what Linux 5.4 does for it
+
+`cfg/22000.c`: `killer1650w_2ax_cfg` = `IWL_DEVICE_22500` (device family 22000, csr v1, `gen2` transport with TFH transmit descriptors,
+multi-queue receive), firmware prefix `iwlwifi-cc-a0-` (version 77 on the author's laptop). Plan, in stages like the 9560's:
+
+1. Boot: the context-info boot (Linux `pcie/ctxt-info.c`, family 22000 uses version 1; the code was written and tried on the 9560 in commit
+   e3c2af8, where it was wrong, and is the right mechanism here), `iwl_pcie_gen2_rx_init` (the firmware configures the RFH itself; restock the
+   free ring when the ALIVE interrupt arrives), the gen2 command queue (TFH descriptor, 25 buffers, queue created by the host before the
+   boot and described in the context info). A unified image: the NVM read and calibration run inside the runtime image
+   (`INIT_EXTENDED_CFG_CMD`, `NVM_ACCESS_CMD`, `NVM_ACCESS_COMPLETE`, wait for `INIT_COMPLETE_NOTIF`).
+2. Queues: transmit queues are created by `SCD_QUEUE_CONFIG_CMD` (the firmware returns the queue id), not by writing scheduler registers.
+3. Command versions: the firmware's `IWL_UCODE_TLV_CMD_VERSIONS` table says which version of PHY context, MAC context, station, scan, TX
+   command (the gen2 TX command), rate format to use.
+4. Then scan, join, aggregation, VHT80 / HE as for the 9560.
+Testers: the author's laptop (an ArcaOS partition; a second machine is used meanwhile), an OS2World user (AX210).
