@@ -602,6 +602,52 @@ static UCHAR join_ctrl(void)
    return PHY_VHT_CTRL_POS_1_BELOW;
 }
 
+/* AX200: the firmware's own rate scaling (TLC_MNG_CONFIG_CMD v3, iwx_rs_init_v3): what the AP supports, the width, the chains. */
+static ULONG mcs_mask(int max)
+{
+   ULONG m = 0;
+   int   k;
+
+   for (k = 0; k <= max; k++)
+      m = (m << 1) | 1UL;
+   return m;
+}
+
+static int send_tlc(void)
+{
+   static UCHAR c[28];
+   USHORT i, nh = 0, mpdu;
+
+   fmemset((UCHAR FAR *)c, 0, sizeof(c));
+   c[0] = STATION_ID;
+   for (i = 0; i < 4; i++)
+      if (g_ap_rates_cck & (1 << i))
+         nh |= (USHORT)(1 << i);
+   for (i = 4; i < 12; i++)
+      if (g_ap_rates_ofdm & (1 << (i - 4)))
+         nh |= (USHORT)(1 << i);
+   put16((UCHAR FAR *)c + 10, nh);                 /* non_ht_rates                                              */
+   if (g_jht && g_j80) {
+      c[5] = 2;                                    /* mode: VHT                                                 */
+      put16((UCHAR FAR *)c + 12, (USHORT)mcs_mask(vht_max_mcs(1)));
+      if (two_streams())
+         put16((UCHAR FAR *)c + 16, (USHORT)mcs_mask(vht_max_mcs(2)));
+   } else if (g_jht) {
+      c[5] = 1;                                    /* mode: HT                                                  */
+      put16((UCHAR FAR *)c + 12, (USHORT)g_jht_mcs[0]);
+      if (two_streams())
+         put16((UCHAR FAR *)c + 16, (USHORT)g_jht_mcs[1]);
+   }
+   c[4] = (UCHAR)(g_j80 ? 2 : (g_j40 ? 1 : 0));    /* max_ch_width                                              */
+   c[6] = (UCHAR)((g_jht && two_streams()) ? 3 : 1);   /* chains A (and B)                                       */
+   mpdu = (USHORT)(g_jht ? (g_j80 ? 3895 : 3839) : 2304);
+   put16((UCHAR FAR *)c + 20, mpdu);               /* max_mpdu_len                                              */
+   if (g_jht && g_ap_ht_sgi20) c[22] |= 1;
+   if (g_jht && g_ap_ht_sgi40) c[22] |= 2;
+   if (g_jht && g_j80 && g_jvsgi80) c[22] |= 4;
+   return iwl_cmd_async(WIDE_ID(DATA_PATH_GROUP, 0x0F), (UCHAR FAR *)c, sizeof(c));
+}
+
 int hw_join_complete(void)
 {
    UCHAR ch = (UCHAR)(two_streams() ? 2 : 1);
@@ -617,7 +663,11 @@ int hw_join_complete(void)
    g_assoc_on = 1;
    if (iwl_send_sf(SF_FULL_ON, 1) || allow_mcast() || iwl_send_power() || send_mac_power() || iwl_send_quota(1))
       return -4;
-   if (send_lq())
+   if (g_cfg->family == IWL_FAM_22000) {
+      g_lad_n = 0;                                 /* the firmware scales the rate; no host ladder           */
+      if (send_tlc())
+         return -5;
+   } else if (send_lq())
       return -5;
    if (g_te_on && time_event(0, 0, 0) == 0)        /* associated: the session protection can go               */
       g_te_on = 0;
@@ -809,10 +859,8 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
       fl = protect ? 0UL : 2UL;                    /* ENCRYPT_DIS unless the hardware encrypts (it adds the CCMP header)  */
       if (mgmt)
          fl |= 1UL;                                /* CMD_RATE: the rate of this command                      */
-      else {
-         fl |= 1UL;                                /* data: the rung the host's rate control trusts           */
-         rate = rs_rate();
-      }
+      else
+         rate = 0UL;                               /* data: the firmware's rate scaling (TLC) chooses        */
       put32(s + 8, fl);
       put32(s + 20, rate);
       fmemcpy(s + 24, hdr, hlen);
