@@ -361,3 +361,7 @@ LMAC / UMAC pointers are at the same offsets) and records the length. An unhandl
 Stage 2 is in the same build (`r3` marker unchanged): the gen2 command queue (TFH descriptor: 256 bytes, header buffer 20 bytes + rest, wide command header
 for every command, write pointer register with the queue id in bits 16+), then `INIT_EXTENDED_CFG_CMD` (SYSTEM group 2, command 3, flags = NVM), `NVM_ACCESS_COMPLETE`
 (group 0x0C, command 0) and the wait for `INIT_COMPLETE_NOTIF`. Success reads `LASTERR=AX200 stage 2 done: ALIVE, two commands through the gen2 command queue and INIT_COMPLETE ...`.
+
+**AX200, second test (build ecd35f3): stage 2 done.** `STATE=0033 ... LASTERR=AX200 stage 2 done`: ALIVE (`ALIVENTF len=0090 first16=FECA00004D0000002C2ADA3C...`: status 0xCAFE, firmware 77.0x3CDA2A2C, 144 bytes),
+`ERRTBL=004DFF20 SCHED=00620000`, both commands answered (`CMDS=0002: 0203/0000 0C00/0000`) and `INIT_COMPLETE_NOTIF` received. The gen2 command queue works. Next: `NVM_GET_INFO` (MAC address, channels),
+then the runtime phase of the unified firmware and the data queues.
