@@ -760,7 +760,7 @@ static int sta_key(UCHAR FAR *key, USHORT pairwise, UCHAR idx, USHORT remove)
 
    fmemset((UCHAR FAR *)&c, 0, sizeof(c));
    c.sta_id = STATION_ID;
-   c.key_offset = (UCHAR)(pairwise ? 0 : 1 + (idx & 3));
+   c.key_offset = (UCHAR)(pairwise ? 0 : (g_cfg->family == IWL_FAM_22000 ? 1 : 1 + (idx & 3)));   /* iwx: the group key is at offset 1 */
    c.key_flags = (USHORT)(STA_KEY_FLG_WEP_KEY_MAP | ((USHORT)(pairwise ? 0 : (idx & 3)) << STA_KEY_FLG_KEYID_POS));
    if (remove)
       c.key_flags |= STA_KEY_NOT_VALID | STA_KEY_FLG_NO_ENC;

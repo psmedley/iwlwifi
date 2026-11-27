@@ -184,7 +184,7 @@ static int send_bt_init(void)
    static bt_coex_cmd_t c;
 
    c.mode = BT_COEX_WIFI;
-   c.enabled_modules = BT_COEX_HIGH_BAND_RET;
+   c.enabled_modules = (g_cfg->family == IWL_FAM_22000) ? 0UL : BT_COEX_HIGH_BAND_RET;   /* iwx enables no module on the 22000 family */
    return iwl_cmd1(CMD_BT_CONFIG, (UCHAR FAR *)&c, sizeof(c));
 }
 
@@ -494,6 +494,14 @@ static int ax200_runtime(void)
       return fail("AX200 stage 4: TX_ANT_CONFIGURATION failed", 0UL);
    if (send_bt_init())
       tstr("[iwl: BT coexistence command refused]");
+   {
+      static UCHAR soc[8];                         /* SOC_CONFIGURATION_CMD (SYSTEM_GROUP 1): flags DISCRETE, latency 0 (iwx, AX200) */
+
+      fmemset((UCHAR FAR *)soc, 0, sizeof(soc));
+      soc[0] = 1;
+      if (iwl_cmd1(WIDE_ID(SYSTEM_GROUP, 1), (UCHAR FAR *)soc, 8))
+         tstr("[iwl: SOC configuration command refused]");
+   }
    step(0x35);
    if (0 && add_aux_sta())                         /* iwx scans without an auxiliary station; its queue command crashes fw 50 */
       return fail("AX200 stage 4: the auxiliary station or its queue could not be created", (ULONG)g_q22_fail);
@@ -508,6 +516,11 @@ static int ax200_runtime(void)
    if (iwl_scan_config())
       return fail("AX200 stage 4: scan configuration failed", 0UL);
    step(0x38);
+   {
+      static beacon_filter_cmd_t bf;               /* iwx_disable_beacon_filter: all zero                         */
+
+      iwl_cmd1(CMD_REPLY_BEACON_FILTERING, (UCHAR FAR *)&bf, sizeof(bf));
+   }
    iwl_mac_reset();
    if (!g_cfgmac) {
       fmemcpy((UCHAR FAR *)g_mymac, (UCHAR FAR *)g_hw_mac, 6);
