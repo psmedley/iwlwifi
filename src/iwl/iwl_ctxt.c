@@ -147,6 +147,10 @@ void iwl9_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), v
       ps(" stts="); ph(get32(iwl_rbstat_ptr()), 8); ps(" used0="); ph(get32(DPTR(g_ubd)), 8); nl();
       ps("CHICK="); ph(iwl_prph_rd(0xA05C00UL), 8); ps(" DRV_GP1="); ph(iwl_rd(0x054), 8); ps(" DRV_GP2="); ph(iwl_rd(0x060), 8);
       ps(" MBOX="); ph(iwl_rd(0x088), 8); ps(" FHINT="); ph(iwl_rd(0x010), 8); nl();
+      ps("RFHST gen="); ph(iwl_prph_rd(0xA09808UL), 8); ps(" rbd0="); ph(iwl_prph_rd(0xA08300UL), 8);
+      ps(","); ph(iwl_prph_rd(0xA08304UL), 8); ps(" rbd1="); ph(iwl_prph_rd(0xA08308UL), 8);
+      ps(" orb="); ph(iwl_prph_rd(0xA08280UL), 8); ps(" vaid="); ph(iwl_prph_rd(0xA081C0UL), 8);
+      ps(" sbcpu1="); ph(iwl_prph_rd(0xA01E30UL), 8); nl();
       ps("RFHREGS fbd="); ph(iwl_prph_rd(RFH_Q_FRBDCB_BA_LSB), 8); ps(" ubd="); ph(iwl_prph_rd(RFH_Q_URBDCB_BA_LSB), 8);
       ps(" stts="); ph(iwl_prph_rd(RFH_Q_URBD_STTS_WPTR), 8); ps(" want fbd="); ph(g_fbd.phys, 8); ps(" ubd="); ph(g_ubd.phys, 8);
       ps(" stts="); ph(iwl_rbstat_phys(), 8); nl();

@@ -864,6 +864,8 @@ int iwl_load_ucode(USHORT type)
 {
    g_alive = g_alive_ok = 0;
    g_fw_error = 0;
+   if (g_cfg->family == IWL_FAM_9000)             /* Linux iwl_trans_pcie_start_fw: prepare the card again (sets the OS_ALIVE mailbox bit, cleared by the reset) */
+      iwl_prepare_card_hw();
    iwl_wr(CSR_INT, 0xFFFFFFFFUL);
    if (nic_init()) {
       dd_err("NIC init failed", 0UL);
@@ -882,7 +884,7 @@ int iwl_load_ucode(USHORT type)
       return -2;
    else if (load_firmware_8000(type))             /* 8000 and 9000: the secured CPU1 / CPU2 sections          */
       return -3;
-   if (hw_wait(&g_alive, 1000) || !g_alive_ok) {
+   if (hw_wait(&g_alive, (USHORT)(g_cfg->family == IWL_FAM_9000 ? 3000 : 1000)) || !g_alive_ok) {
       dd_err(g_alive ? "firmware ALIVE with bad status" : "no ALIVE from the firmware", iwl_rd(CSR_INT));
       return -4;
    }

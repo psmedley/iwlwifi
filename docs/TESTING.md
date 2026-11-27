@@ -295,3 +295,8 @@ a failed start (receive-DMA configuration read back, whether the device took any
 (`RFH dmacfg=87940000 gen=00000013 active=00010001`), the device fetched 32 free buffers (`frb_r=0020`), and wrote nothing
 (`urb_w=0`, `stts=0`, `used0=0`). `SBOOT cpu1=00000003 cpu2=000300E2`. Next diagnostics: `RXBUF0/1` (the first bytes of two receive buffers, zeroed at
 start: any DMA write by the device shows), `RFHREGS` (the ring addresses read back against what was meant), `CHICK DRV_GP1 DRV_GP2 MBOX FHINT`.
+
+**9560, sixth test (build 6a19662):** `RXBUF0/1` all zero, `RFHREGS` equal to what was written, `CHICK=01000000` (MSI-mode write took effect): the receive hardware is
+configured and reads the free ring but the firmware never writes anything into it. Candidates left: Linux calls `iwl_pcie_prepare_card_hw`
+again at the start of `start_fw` (this re-sets the OS_ALIVE mailbox bit that the reset in `start_hw` cleared), which the 8260 path
+does not do; the next build does it for the 9000 family, waits 3 s for the ALIVE, and prints the RFH status/descriptor registers (`RFHST`).
