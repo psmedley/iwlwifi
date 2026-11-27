@@ -727,6 +727,17 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
       ps(","); ph(g_errlog[26], 8); ps(","); ph(g_errlog[27], 8); ps(","); ph(g_errlog[28], 8);
       ps(" lastcmdid="); ph(g_errlog[29], 8); ps(" waitevent="); ph(g_errlog[30], 8); nl();
    }
+   if (g_cfg && g_cfg->family >= IWL_FAM_9000) {
+      USHORT k, w;
+      extern UCHAR g_rxd[2][72], g_rxd_set[2];
+
+      for (w = 0; w < 2; w++)
+         if (g_rxd_set[w]) {
+            ps(w ? "RXDGOOD " : "RXDBAD ");
+            for (k = 0; k < 72; k++) ph(g_rxd[w][k], 2);
+            nl();
+         }
+   }
    if (g_cfg && g_cfg->family == IWL_FAM_22000) {
       USHORT k;
       extern UCHAR g_scan_dump[64];

@@ -897,6 +897,9 @@ static USHORT rx_hdrlen(UCHAR FAR *f)
 /* Multi-queue receive (9000 family): REPLY_RX_MPDU carries struct iwl_rx_mpdu_desc (48 bytes) before the frame:
  * mpdu_len @0, mac_flags2 @3 (0x20: two pad bytes after the header, 0x40: A-MSDU), status @12 (1 CRC ok, 2 overrun ok,
  * 0x40 MIC ok, 0x700 security type, 0x800 decrypted), rate @28, energy A/B @32/33, channel @34, gp2 @36. */
+UCHAR g_rxd[2][72];                              /* the first bad (0) and good (1) multi-queue descriptor + frame start */
+UCHAR g_rxd_set[2];
+
 void iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len)
 {
    USHORT bc, st, fl = 0, hl, i;
@@ -910,6 +913,14 @@ void iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len)
    if (bc < 24 || (ULONG)48 + (ULONG)bc > (ULONG)len)
       return;
    g_rx_mpdu++;
+   {
+      USHORT w = (USHORT)((!(st & 0x0001) || !(st & 0x0002)) ? 0 : 1);
+
+      if (!g_rxd_set[w]) {
+         g_rxd_set[w] = 1;
+         fmemcpy((UCHAR FAR *)g_rxd[w], p, 72);
+      }
+   }
    if (!(st & 0x0001) || !(st & 0x0002)) {
       g_rx_crc++;
       return;
