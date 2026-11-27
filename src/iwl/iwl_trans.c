@@ -1368,7 +1368,8 @@ void iwl_txq_reset(USHORT qi, USHORT idx)
 void iwl_txq_reclaim_to(USHORT qi, USHORT idx)
 {
    txq_t *q = &g_txq[qi];
-   USHORT n = (USHORT)((idx - q->tail) & (TFD_QUEUE_SIZE_MAX - 1));
+   USHORT msk = (USHORT)(g_cfg->family == IWL_FAM_22000 ? 31 : (TFD_QUEUE_SIZE_MAX - 1));   /* the gen2 ring has 32 entries */
+   USHORT n = (USHORT)((idx - q->tail) & msk);
 
    if (n > q->queued)
       return;
@@ -1379,7 +1380,7 @@ void iwl_txq_reclaim_to(USHORT qi, USHORT idx)
          q->busy[s] = 0;
          q->queued--;
       }
-      q->tail = (USHORT)((q->tail + 1) & (TFD_QUEUE_SIZE_MAX - 1));
+      q->tail = (USHORT)((q->tail + 1) & msk);
    }
 }
 

@@ -929,6 +929,7 @@ void   iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);
 void   iwl_te_notif(UCHAR FAR *p, USHORT len);
 void   iwl_mac_reset(void);
 ULONG  rs_rate(void);
+void   iwl22_ba_notif(UCHAR FAR *p, USHORT len);
 int    hw_ax200_reset(void);
 extern UCHAR g_phy_on;
 extern USHORT g_tx_ok, g_tx_fail, g_rx_mpdu, g_rx_crc, g_rx_decfail;

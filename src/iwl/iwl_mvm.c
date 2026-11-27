@@ -327,7 +327,10 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
          iwl_rx_mpdu(p, len);
       break;
    case CMD_BA_NOTIF:
-      txa_ba_notif(p, len);
+      if (g_cfg->family == IWL_FAM_22000)
+         iwl22_ba_notif(p, len);
+      else
+         txa_ba_notif(p, len);
       break;
    case CMD_TX:
       iwl_tx_done(qid, idx, p, len);

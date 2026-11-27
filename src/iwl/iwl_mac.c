@@ -810,7 +810,7 @@ int hw_key_clear(USHORT pairwise, UCHAR idx)
 /* hdr: the 802.11 header (24 bytes), body: what follows it. Layout of a slot: cmd header (4), tx command (56),
  * the 802.11 header; the payload (CCMP header + body) at offset 256. */
 
-USHORT g_txlog[16][2], g_txlog_n;
+USHORT g_txlog[16][2], g_txlog_n, g_ba22_n;
 static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt);
 
 static int tx_frame(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt)
@@ -943,12 +943,61 @@ int hw_data_tx(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT
    return tx_frame(hdr, hlen, body, blen, (USHORT)((flags & HWTX_PROTECT) ? 1 : 0), 0);
 }
 
+/* AX200: a compressed block-ack notification (COMPRESSED_BA_RES v4): the ring indices of our queue up to which the A-MPDU frames are done. */
+void iwl22_ba_notif(UCHAR FAR *p, USHORT len)
+{
+   USHORT tc, rc, i, o;
+
+   g_ba22_n++;
+   if (len < 32)
+      return;
+   tc = get16(p + 28);
+   rc = get16(p + 30);
+   o = (USHORT)(32 + rc * 2);
+   if ((ULONG)o + (ULONG)tc * 8UL > (ULONG)len)
+      return;
+   for (i = 0; i < tc; i++) {
+      UCHAR FAR *t = p + o + i * 8;
+
+      if (get16(t) == iwl_txq_qid(QI_BE)) {
+         USHORT fl = rt_irq_save();
+
+         if (!rt_lock_acquire(&g_hwtxlk, (USHORT)(rt_cpu_id() + 1))) {
+            iwl_txq_reclaim_to(QI_BE, (USHORT)(get16(t + 2) & 31));
+            rt_lock_release(&g_hwtxlk);
+         }
+         rt_irq_restore(fl);
+      }
+   }
+}
+
 void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
 {
    USHORT st, stoff = (USHORT)(g_cfg->family == IWL_FAM_22000 ? 40 : 36);   /* TX_RSP v6 has a longer fixed part */
 
    if (len < stoff + 4)
       return;
+   if (g_cfg->family == IWL_FAM_22000) {           /* new TX API: the response carries the ring index up to which the frames are done (SSN); an A-MPDU is released by its block ack */
+      st = (USHORT)(get16(p + stoff) & TX_STATUS_MSK);
+      g_tx_last_st = get16(p + stoff);
+      g_tx_last_rate = get32(p + 4);
+      g_tx_last_fail = p[3];
+      g_tx_st_hist[(st == TX_STATUS_SUCCESS) ? 0 : (st == TX_STATUS_DIRECT_DONE) ? 1 : (st < 0x80) ? 2 : 3]++;
+      if (st == TX_STATUS_SUCCESS || st == TX_STATUS_DIRECT_DONE)
+         g_tx_ok++;
+      else
+         g_tx_fail++;
+      if (p[0] == 1 && len >= (USHORT)(stoff + 8)) {
+         USHORT fl = rt_irq_save();
+
+         if (!rt_lock_acquire(&g_hwtxlk, (USHORT)(rt_cpu_id() + 1))) {
+            iwl_txq_reclaim_to(QI_BE, (USHORT)(get32(p + stoff + 4) & 31));
+            rt_lock_release(&g_hwtxlk);
+         }
+         rt_irq_restore(fl);
+      }
+      return;
+   }
    if (p[2] == 0)
       rs_resp(p[3]);                               /* failure_rts == 0: data statistics for the rate ladder   */
    if (p[0] > 1 && iwl_txq_present(QI_AGG) && qid == iwl_txq_qid(QI_AGG)) {
