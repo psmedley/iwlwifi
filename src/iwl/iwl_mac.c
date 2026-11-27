@@ -244,10 +244,9 @@ static int add_sta(USHORT update)
       c.station_flags |= (ULONG)(g_j80 ? g_jvexp : (g_ampdu_par & 3)) << STA_FLG_MAX_AGG_SIZE_SHIFT;
       c.station_flags |= (ULONG)((g_ampdu_par >> 2) & 7) << STA_FLG_AGG_MPDU_DENS_SHIFT;
    }
-   if (g_cfg->family == IWL_FAM_22000) {           /* gen2: the queues are created by SCD_QUEUE_CFG, no queue mask, no TID disable */
+   if (g_cfg->family == IWL_FAM_22000) {           /* gen2: the queue is created by SCD_QUEUE_CFG, so no queue mask; the TIDs stay disabled for aggregation (all ones, as Linux) until a BA agreement exists */
       c.tfd_queue_msk = 0;
-      c.modify_mask &= (USHORT)~(STA_MODIFY_QUEUES | STA_MODIFY_TID_DISABLE_TX);
-      c.tid_disable_tx = 0;
+      c.modify_mask &= (USHORT)~STA_MODIFY_QUEUES;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
    if (rc == 0 && (st & 0xFFUL) != ADD_STA_SUCCESS)
