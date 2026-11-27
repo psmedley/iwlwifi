@@ -204,8 +204,14 @@ int hw_scan(void)
       put32(r + 40, SCAN_PRIORITY_HIGH);
       if (FW_API(API_ADAPTIVE_DWELL_V2)) {
          r[16] = 10;                               /* active_dwell[LB]                                       */
+         if (g_cfg->family == IWL_FAM_22000) {
+            r[17] = 10;                            /* active_dwell[HB] (second LMAC)                         */
+            r[18] = 8;                             /* v9: adwell_default_hb_n_aps (reserved in v8)            */
+         }
          r[21] = 0x02;                             /* general_flags2: ALLOW_CHNL_REORDER                    */
          r[44] = 110;                              /* passive_dwell[LB]                                     */
+         if (g_cfg->family == IWL_FAM_22000)
+            r[45] = 110;                           /* passive_dwell[HB]                                     */
       } else {
          r[16] = 10; r[17] = 110; r[18] = 44;      /* active, passive, fragmented                           */
       }
