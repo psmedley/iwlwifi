@@ -50,6 +50,7 @@ extern net_t *g_jnet;                           /* the scan entry being joined /
 
 /* called by the back end */
 void   sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxflags, ULONG rxtime);
+#define RXF_MIC_STRIPPED 0x0002                 /* with RXF_DECRYPTED: the hardware also removed the 8-byte MIC at the end (multi-queue receive) */
 #define RXF_DECRYPTED   0x0001                  /* the hardware decrypted it: 8-byte CCMP header + MIC present */
 void   sta_beacon(UCHAR FAR *frame, USHORT len, USHORT chan, short rssi, ULONG rxtime);
 void   sta_scan_clear(void);

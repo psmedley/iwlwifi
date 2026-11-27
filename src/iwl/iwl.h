@@ -838,6 +838,7 @@ extern USHORT g_cmd_last_idx;                    /* ring index of the command qu
 void   iwl_trans_off(void);
 USHORT iwl_rx_cur(void);
 extern USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
+extern ULONG  g_rx_lnf;
 
 /* iwl_fw.c */
 int    iwl_fw_parse(void);

@@ -313,3 +313,10 @@ the driver read the NVM (`MAC=F4:D1:08:C6:99:59`, NVM version 1135, 26 channels,
 means the legacy parser misread the status of 189 of 192 frames. Next build parses the multi-queue descriptor (`iwl_rx_mpdu_mq`: 48-byte
 descriptor before the frame, status word at offset 12, padding after the header, energy and channel in the descriptor); receive block-ack
 sessions are refused on this family for now (the firmware reorders in multi-queue mode).
+
+**9560, ninth test (build 6febe1a): joined.** `LINK=JOINED 88 ... RSN PTK AUTHORIZED HT40 NSS=2` on 5 GHz channel 136 (`NETS=000A`, ten networks
+listed); `wpa_supplicant` connected, but `dhclient` needed a long time to get an address. In multi-queue mode the hardware can remove the
+MIC (the 8 bytes after the data of a CCMP frame) itself: Linux sets `RX_FLAG_MIC_STRIPPED` when the packet's `len_n_flags` has `FH_RSCSR_RADA_EN`
+(bit 26). The station layer always cut 8 bytes as the MIC, so every protected frame lost its last 8 bytes of data (a DHCP offer or an ARP reply
+with a truncated payload is dropped by the stack: long waits). Now `RXF_MIC_STRIPPED` carries that flag and the cut is skipped when the hardware
+already did it. The 8260 path is unchanged.

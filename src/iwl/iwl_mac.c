@@ -929,6 +929,8 @@ void iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len)
          return;
       }
       fl |= RXF_DECRYPTED;
+      if (g_rx_lnf & 0x04000000UL)                 /* FH_RSCSR_RADA_EN: the hardware removed the MIC (Linux RX_FLAG_MIC_STRIPPED) */
+         fl |= RXF_MIC_STRIPPED;
    }
    a = p[32];
    b = p[33];

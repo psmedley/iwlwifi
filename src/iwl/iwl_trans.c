@@ -164,6 +164,7 @@ static USHORT g_irq_masked;
 static USHORT g_auxq, g_dataq;
 void   iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len);                  /* DQA: aux 1, data 5..8; legacy: aux 15, data 0..3       */
 USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
+ULONG  g_rx_lnf;                                /* len_n_flags of the packet being handled                  */
 
 /* ---- DMA memory ------------------------------------------------------------------------------------ */
 #define NTXQ        7                           /* cmd, aux, 4 data (one per access category), TID 0 aggregation */
@@ -395,6 +396,7 @@ static void rx_buffer(USHORT i)
          break;
       g_rx_pkts++;
       g_last_code = code;
+      g_rx_lnf = lnf;
       iwl_rx_pkt(code, p[7], p[6], p + 8, (USHORT)(plen - 4));
       /* the firmware sets bit 7 of qid on notifications it originates; the rest answer a host command */
       if (!(p[7] & 0x80) && p[7] == g_cmdq) {

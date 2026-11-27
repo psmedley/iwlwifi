@@ -887,8 +887,10 @@ void sta_rx_frame(UCHAR FAR *f, USHORT len, UCHAR chan, short rssi, USHORT rxfla
          return;
       }
       hl += 8;                                         /* CCMP header; the 8-byte MIC is at the end         */
-      if (len < hl + 8) { g_rx_drop[4]++; return; }
-      len = (USHORT)(len - 8);
+      if (!(rxflags & RXF_MIC_STRIPPED)) {
+         if (len < hl + 8) { g_rx_drop[4]++; return; }
+         len = (USHORT)(len - 8);
+      }
    }
    if (len < hl + 3 || (USHORT)(len - hl + 14) > sizeof(g_eth)) {
       g_rx_drop[4]++;
