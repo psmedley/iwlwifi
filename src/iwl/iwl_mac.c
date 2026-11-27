@@ -22,6 +22,7 @@ ULONG  g_tx_last_rate;
 
 static int two_streams(void);
 
+UCHAR g_phy_on;                                 /* AX200: the PHY context exists (removed again when the link ends, as iwx does) */
 static USHORT g_mac_on, g_bind_on, g_sta_on, g_te_on, g_assoc_on;
 static ULONG  g_te_uid;
 static UCHAR  g_ptk[16];
@@ -563,8 +564,9 @@ int hw_join_prepare(net_t *n)
    if (!g_hw_ready)
       return -1;
    scan_rates((UCHAR FAR *)n->ie + 12, (USHORT)(n->ielen > 12 ? n->ielen - 12 : 0), hi);
-   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, n->ch, 1, 1, 0, 0))
+   if (iwl_send_phy_ctxt((USHORT)((g_cfg->family == IWL_FAM_22000 && !g_phy_on) ? FW_CTXT_ACTION_ADD : FW_CTXT_ACTION_MODIFY), n->ch, 1, 1, 0, 0))
       return -2;
+   g_phy_on = 1;
    if (mac_ctxt(FW_CTXT_ACTION_ADD, 0))
       return -3;
    g_mac_on = 1;
@@ -710,7 +712,11 @@ void hw_leave(void)
       mac_ctxt(FW_CTXT_ACTION_REMOVE, 0);
       g_mac_on = 0;
    }
-   iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0);
+   if (g_cfg->family == IWL_FAM_22000) {          /* iwx_deauth: the PHY context is removed with the link */
+      iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_REMOVE, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0);
+      g_phy_on = 0;
+   } else
+      iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0);
 }
 
 /* ---- receive aggregation -------------------------------------------------------------------------------------

@@ -508,6 +508,7 @@ static int ax200_runtime(void)
    step(0x36);
    if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
       return fail("AX200 stage 4: PHY context add failed", 0UL);
+   g_phy_on = 1;
    if (iwl_send_power())
       return fail("AX200 stage 4: POWER_TABLE failed", 0UL);
    step(0x37);

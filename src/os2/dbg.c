@@ -318,6 +318,11 @@ static void build_status(void)
       for (k = 0; k < m; k++) { ps(" "); ph(g_seclog[(g_seclog_n > 12 ? g_seclog_n + k : k) % 12], 8); }
       nl();
    }
+   {
+      extern USHORT g_lost_reason; extern UCHAR g_lost_fc;
+
+      ps("LOST last deauth(C0)/disassoc(A0) from the AP: frame="); ph(g_lost_fc, 2); ps(" reason="); ph(g_lost_reason, 4); nl();
+   }
    ps("WIDTH maxwidth="); ph(g_maxw, 1);
    if (g_jnet) {
       ps(" ap: vhtcaps="); ph(g_jnet->vht, 1); ps(" vht80="); ph(g_jnet->vhtw, 1); ps(" centre="); ph(g_jnet->vcf0, 2);

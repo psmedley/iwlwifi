@@ -17,6 +17,8 @@ USHORT g_nnet;
 USHORT g_joined, g_authorized, g_ptk_on, g_open_net;
 UCHAR  g_jbssid[6], g_jssid[32], g_jslen, g_jch;
 USHORT g_jfail;
+USHORT g_lost_reason = 0xFFFF;
+UCHAR  g_lost_fc;
 UCHAR  g_jreq[200], g_jres[160];
 USHORT g_jreqlen, g_jreslen, g_jcaps, g_jaid, g_jbcn, g_jdtim;
 UCHAR  g_jht, g_jht_mcs[2], g_jrates[12];
@@ -737,6 +739,8 @@ static void sta_mgmt_rx(UCHAR FAR *f, USHORT len)
       g_assoc_reslen = n;
       g_assoc_rx = 1;
    } else if (fc0 == 0xC0 || fc0 == 0xA0) {              /* deauthentication / disassociation                 */
+      g_lost_fc = fc0;
+      g_lost_reason = (USHORT)(len >= 26 ? get16(f + 24) : 0xFFFF);   /* the AP's reason code (status text LOST) */
       g_link_lost = 1;
    } else if (fc0 == 0xD0 && len >= 26 && g_joined) {    /* action                                            */
       if (f[24] == 3 && f[25] == 0)                      /* block ack: ADDBA request                          */
