@@ -665,9 +665,17 @@ int hw_join_complete(void)
    if (iwl_send_sf(SF_FULL_ON, 1) || allow_mcast() || iwl_send_power() || send_mac_power() || iwl_send_quota(1))
       return -4;
    if (g_cfg->family == IWL_FAM_22000) {
-      g_lad_n = 0;                                 /* the firmware scales the rate; no host ladder           */
-      if (send_tlc())
-         return -5;
+      if (g_ax_tlc) {
+         g_lad_n = 0;                              /* the firmware scales the rate; no host ladder           */
+         if (send_tlc())
+            return -5;
+      } else {                                     /* AX200TLC=0: rates from the host ladder in every TX command */
+         ladder_build();
+         g_rs_cur = g_rs_good = g_rs_bad = g_rs_probe = 0;
+         g_rs_block = 0;
+         g_rs_hold = 3000UL;
+         g_rs_t = dd_ms();
+      }
    } else if (send_lq())
       return -5;
    if (g_te_on && time_event(0, 0, 0) == 0)        /* associated: the session protection can go               */
@@ -869,8 +877,12 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
       fl = protect ? 0UL : 2UL;                    /* ENCRYPT_DIS unless the hardware encrypts (it adds the CCMP header)  */
       if (mgmt)
          fl |= 1UL;                                /* CMD_RATE: the rate of this command                      */
-      else
+      else if (g_ax_tlc)
          rate = 0UL;                               /* data: the firmware's rate scaling (TLC) chooses        */
+      else {
+         fl |= 1UL;
+         rate = rs_rate();                         /* AX200TLC=0: the host's ladder                          */
+      }
       put32(s + 8, fl);
       put32(s + 20, rate);
       fmemcpy(s + 24, hdr, hlen);
@@ -943,11 +955,14 @@ int hw_data_tx(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT
 }
 
 /* AX200: a compressed block-ack notification (COMPRESSED_BA_RES v4): the ring indices of our queue up to which the A-MPDU frames are done. */
+UCHAR g_ba_dump[48], g_txr_dump[48];
+
 void iwl22_ba_notif(UCHAR FAR *p, USHORT len)
 {
    USHORT tc, rc, i, o;
 
    g_ba22_n++;
+   fmemcpy((UCHAR FAR *)g_ba_dump, p, len < 48 ? len : 48);
    if (len < 32)
       return;
    tc = get16(p + 28);
@@ -977,6 +992,7 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    if (len < stoff + 4)
       return;
    if (g_cfg->family == IWL_FAM_22000) {           /* new TX API: the response carries the ring index up to which the frames are done (SSN); an A-MPDU is released by its block ack */
+      fmemcpy((UCHAR FAR *)g_txr_dump, p, len < 48 ? len : 48);
       st = (USHORT)(get16(p + stoff) & TX_STATUS_MSK);
       g_tx_last_st = get16(p + stoff);
       g_tx_last_rate = get32(p + 4);

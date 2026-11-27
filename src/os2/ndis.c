@@ -563,6 +563,11 @@ static void pi_line(char *l)
          g_rateadapt = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "ax200tlc")) {      /* AX200TLC = 0 | 1: the firmware's rate scaling (default 1) or rates from the host in every frame */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_ax_tlc = (UCHAR)(*v == '0' ? 0 : 1);
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "streams")) {       /* STREAMS = 1 | 2: spatial streams to use (default 2)  */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_maxnss = (UCHAR)(*v == '1' ? 1 : 2);

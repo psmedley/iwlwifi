@@ -781,7 +781,13 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    }
    if (g_cfg && g_cfg->family == IWL_FAM_22000) {
       USHORT k;
-      extern UCHAR g_scan_dump[64];
+      extern UCHAR g_scan_dump[64], g_ba_dump[48], g_txr_dump[48];
+      extern USHORT g_ba22_n;
+      extern UCHAR g_ax_tlc;
+
+      ps("AX200 tlc="); ph(g_ax_tlc, 1); ps(" banotifs="); ph(g_ba22_n, 4); nl();
+      ps("LASTBA "); for (k = 0; k < 48; k++) ph(g_ba_dump[k], 2); nl();
+      ps("LASTTXR "); for (k = 0; k < 48; k++) ph(g_txr_dump[k], 2); nl();
 
       ps("SCANTRY var="); ph(g_scan_variant, 2); ps(" results(1 ok 2 crash 3 fail)=");
       for (k = 0; k < 5; k++) ph(g_try[k], 2);
