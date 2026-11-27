@@ -856,6 +856,7 @@ int    iwl_send_quota(USHORT running);
 
 /* iwl_nvm.c */
 int    iwl_nvm_init(void);
+int    iwl_nvm_init_22000(void);                /* NVM_GET_INFO (AX200)                                       */
 extern UCHAR  g_nvm_chan[64];
 extern USHORT g_nvm_flags[64];                   /* usable channels (scan list)                            */
 extern USHORT g_nvm_nchan;

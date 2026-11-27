@@ -162,6 +162,57 @@ static int nvm_init_7000(void)
    return 0;
 }
 
+/* The 22000 family (AX200): NVM_GET_INFO (REGULATORY_AND_NVM_GROUP 0x0C, command 2) returns everything in one answer: general (flags,
+ * version @4, board type, number of addresses), SKU flags @8, TX / RX chains @12 / @16, LAR @20, channel count @24 and the 32-bit channel
+ * flags from @28 (Linux iwl_get_nvm, response version 4; the older version 3 has 16-bit flags). The MAC address is the strap in the CSR
+ * (0x08 / 0x0C, bytes reversed). */
+int iwl_nvm_init_22000(void)
+{
+   static UCHAR req[4];
+   UCHAR FAR *r;
+   ULONG sku, a0, a1;
+   USHORT i, v4;
+   U32    u;
+
+   if (iwl_cmd(WIDE_ID(0x0C, 2), (UCHAR FAR *)req, 4, (UCHAR FAR *)0, 0, CMDF_WANT_RESP) || g_resp_len < 28 + 4)
+      return -1;
+   r = g_resp;
+   v4 = (USHORT)(g_resp_len >= 28 + 4 * 110);
+   g_nvm_version = get16(r + 4);
+   sku = get32(r + 8);
+   g_nvm_tx_ant = (UCHAR)get32(r + 12);
+   g_nvm_rx_ant = (UCHAR)get32(r + 16);
+   g_nvm_lar = (UCHAR)(get32(r + 20) != 0UL);
+   g_nvm_5ghz = (UCHAR)((sku & 0x02UL) != 0);
+   g_nvm_11n  = (UCHAR)((sku & 0x04UL) != 0);
+   g_nvm_11ac = (UCHAR)((sku & 0x08UL) != 0);
+   g_nvm_nchan = 0;
+   for (i = 0; i < 51; i++) {
+      USHORT f;
+
+      if ((USHORT)(28 + (v4 ? 4 : 2) * (i + 1)) > g_resp_len)
+         break;
+      f = v4 ? get16(r + 28 + 4 * i) : get16(r + 28 + 2 * i);
+      if (!(f & 0x0001))
+         continue;
+      if (i >= 14 && !g_nvm_5ghz)
+         continue;
+      if (g_nvm_nchan < sizeof(g_nvm_chan)) {
+         g_nvm_flags[g_nvm_nchan] = f;
+         g_nvm_chan[g_nvm_nchan++] = g_chan8000[i];
+      }
+   }
+   a0 = iwl_rd(0x008);
+   a1 = iwl_rd(0x00C);
+   u.l = a0;
+   g_hw_mac[0] = u.b[3]; g_hw_mac[1] = u.b[2]; g_hw_mac[2] = u.b[1]; g_hw_mac[3] = u.b[0];
+   u.l = a1;
+   g_hw_mac[4] = u.b[1]; g_hw_mac[5] = u.b[0];
+   if (!valid_mac((UCHAR FAR *)g_hw_mac))
+      dd_err("the NVM holds no valid MAC address; set NETADDRESS in PROTOCOL.INI", 0UL);
+   return 0;
+}
+
 int iwl_nvm_init(void)
 {
    static UCHAR mac_ovr[6];

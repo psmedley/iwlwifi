@@ -365,3 +365,8 @@ for every command, write pointer register with the queue id in bits 16+), then `
 **AX200, second test (build ecd35f3): stage 2 done.** `STATE=0033 ... LASTERR=AX200 stage 2 done`: ALIVE (`ALIVENTF len=0090 first16=FECA00004D0000002C2ADA3C...`: status 0xCAFE, firmware 77.0x3CDA2A2C, 144 bytes),
 `ERRTBL=004DFF20 SCHED=00620000`, both commands answered (`CMDS=0002: 0203/0000 0C00/0000`) and `INIT_COMPLETE_NOTIF` received. The gen2 command queue works. Next: `NVM_GET_INFO` (MAC address, channels),
 then the runtime phase of the unified firmware and the data queues.
+
+**AX200, third build (stage 3, after ecd35f3): `NVM_GET_INFO`.** Between `INIT_EXTENDED_CFG_CMD` and `NVM_ACCESS_COMPLETE` the driver now asks the firmware for the NVM contents
+(`REGULATORY_AND_NVM_GROUP` 0x0C command 2; answer: version, SKU flags, TX / RX chains, LAR, 32-bit channel flags) and takes the MAC address from the strap registers at CSR 0x08 / 0x0C.
+Success: `LASTERR=AX200 stage 3 done ...` with `MAC=` filled in and the `NVM ver= chans= 5G= 11n= 11ac= txant= rxant= LAR=` line. Still to write for this family: restart into the runtime phase
+(the unified firmware is started a second time without reading the NVM), the gen2 queue creation command, the gen2 transmit command and status, then the commands the 9560 path already sends (PHY, MAC, station, scan) in their newer versions.

@@ -491,6 +491,9 @@ int hw_up(void)
          if (iwl_cmd1(WIDE_ID(SYSTEM_GROUP, 3), (UCHAR FAR *)ic, 4))
             return fail("AX200 stage 2: INIT_EXTENDED_CFG_CMD failed", 0UL);
          step(0x31);
+         if (iwl_nvm_init_22000())
+            return fail("AX200 stage 3: NVM_GET_INFO failed", 0UL);
+         step(0x34);
          put32((UCHAR FAR *)nc, 0UL);                /* NVM_ACCESS_COMPLETE (REGULATORY_AND_NVM_GROUP 0x0C)      */
          if (iwl_cmd1(WIDE_ID(0x0C, 0), (UCHAR FAR *)nc, 4))
             return fail("AX200 stage 2: NVM_ACCESS_COMPLETE failed", 0UL);
@@ -506,7 +509,7 @@ int hw_up(void)
          }
       }
       step(0x33);
-      return fail("AX200 stage 2 done: ALIVE, two commands through the gen2 command queue and INIT_COMPLETE; queues, NVM and the rest are not written yet", g_sched_base);
+      return fail("AX200 stage 3 done: ALIVE, INIT phase and NVM_GET_INFO (MAC, channels); the runtime phase, queues and data are not written yet", g_sched_base);
    }
    if (run_init_image())
       return -1;
