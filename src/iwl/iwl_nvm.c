@@ -202,12 +202,20 @@ int iwl_nvm_init_22000(void)
          g_nvm_chan[g_nvm_nchan++] = g_chan8000[i];
       }
    }
-   a0 = iwl_rd(0x008);
-   a1 = iwl_rd(0x00C);
+   a0 = iwl_rd(0x388);                             /* CSR_MAC_ADDR0_STRAP: the address fused by the OEM, else the OTP one (0x380) */
+   a1 = iwl_rd(0x38C);
    u.l = a0;
    g_hw_mac[0] = u.b[3]; g_hw_mac[1] = u.b[2]; g_hw_mac[2] = u.b[1]; g_hw_mac[3] = u.b[0];
    u.l = a1;
    g_hw_mac[4] = u.b[1]; g_hw_mac[5] = u.b[0];
+   if (!valid_mac((UCHAR FAR *)g_hw_mac)) {
+      a0 = iwl_rd(0x380);
+      a1 = iwl_rd(0x384);
+      u.l = a0;
+      g_hw_mac[0] = u.b[3]; g_hw_mac[1] = u.b[2]; g_hw_mac[2] = u.b[1]; g_hw_mac[3] = u.b[0];
+      u.l = a1;
+      g_hw_mac[4] = u.b[1]; g_hw_mac[5] = u.b[0];
+   }
    if (!valid_mac((UCHAR FAR *)g_hw_mac))
       dd_err("the NVM holds no valid MAC address; set NETADDRESS in PROTOCOL.INI", 0UL);
    return 0;

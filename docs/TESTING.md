@@ -379,3 +379,9 @@ with a ring of 16 TFH descriptors and a byte-count table; the answer gives the q
 configuration, then `STATE=0064 READY`: scanning works, **joining does not yet** (no data queues, no transmit command, no rate-scaling offload command). A scan is `echo scan > \DEV\WRND32$`
 or the Wireless LAN Monitor; networks appear in the `NET=` lines.
 The code segment is at 57 KB of the 64 KB a small-model driver can have; the data path of this family will need the medium memory model (several code segments) or a trimmed status output.
+
+**AX200, fifth test (build ef91661, firmware 50): the NVM phase works, `TX_ANT_CONFIGURATION` crashes the firmware.** `NVM` read fine (`chans=32 5G=1 11n=1 11ac=1 txant=3 rxant=3 LAR=1`),
+firmware 50 boots like 77 (`ALIVENTF len=0074`), the first three commands answered, the fourth (`0x98`) timed out with a firmware assertion (`FWLOG id=00000071`, `UMACLOG cmd=00030098`).
+Linux does not send it in the first start: it stops the device after the NVM read and starts the unified firmware a second time (`iwl_mvm_start_get_nvm` then `iwl_mvm_up`), and the
+runtime commands go to that second instance; I had skipped the restart. The MAC address (`HWMAC=...8B`) was read from the wrong CSR (0x08 is `CSR_INT`); the straps are at 0x388 / 0x38C
+(OTP 0x380 / 0x384). Both fixed in the next build.

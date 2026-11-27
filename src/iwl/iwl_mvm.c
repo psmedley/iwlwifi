@@ -451,6 +451,39 @@ static int run_init_image(void)
    return 0;
 }
 
+/* The unified (22000 family) firmware: start the runtime image, INIT_EXTENDED_CFG_CMD (NVM phase), NVM contents (first run only), NVM_ACCESS_COMPLETE, wait for
+ * INIT_COMPLETE_NOTIF. Returns 0, or the result of fail(). */
+static int ax200_unified(USHORT read_nvm)
+{
+   static UCHAR ic[4], nc[4];
+   ULONG t0;
+   int   rc;
+
+   if ((rc = iwl_load_ucode(UCODE_REGULAR)) != 0)
+      return fail("the AX200 firmware did not start (code: 3 load, 4 no ALIVE, 5 context information)", (ULONG)(USHORT)(-rc));
+   step(0x30);
+   put32((UCHAR FAR *)ic, 2UL);                    /* init_flags = BIT(IWL_INIT_NVM)                            */
+   if (iwl_cmd1(WIDE_ID(SYSTEM_GROUP, 3), (UCHAR FAR *)ic, 4))
+      return fail("AX200: INIT_EXTENDED_CFG_CMD failed", 0UL);
+   step(0x31);
+   if (read_nvm && iwl_nvm_init_22000())
+      return fail("AX200: NVM_GET_INFO failed", 0UL);
+   put32((UCHAR FAR *)nc, 0UL);                    /* NVM_ACCESS_COMPLETE (REGULATORY_AND_NVM_GROUP 0x0C)      */
+   if (iwl_cmd1(WIDE_ID(0x0C, 0), (UCHAR FAR *)nc, 4))
+      return fail("AX200: NVM_ACCESS_COMPLETE failed", 0UL);
+   step(0x32);
+   g_init_complete = 0;
+   t0 = dd_ms();
+   while (!g_init_complete) {
+      hw_wait(&g_init_complete, 100);
+      if (g_fw_error)
+         return fail("AX200: firmware error while waiting for INIT_COMPLETE", g_err_table);
+      if ((long)(dd_ms() - t0) > 3000L)
+         return fail("AX200: no INIT_COMPLETE_NOTIF", 0UL);
+   }
+   return 0;
+}
+
 int hw_up(void)
 {
    USHORT ac;
@@ -486,37 +519,18 @@ int hw_up(void)
    if (g_rfkill)
       return fail("the radio is switched off (hardware RF kill)", iwl_rd(CSR_GP_CNTRL));
    step(8);
-   if (g_cfg->family == IWL_FAM_22000) {           /* AX200, stage 1: boot the (unified) firmware to ALIVE, then stop and report */
-      if ((rc = iwl_load_ucode(UCODE_REGULAR)) != 0)
-         return fail("the AX200 firmware did not start (code: 3 load, 4 no ALIVE, 5 context information)", (ULONG)(USHORT)(-rc));
-      step(0x30);
-      {                                              /* stage 2: the first commands through the gen2 command queue: the INIT phase of the unified image */
-         static UCHAR ic[4], nc[4];
-         ULONG t0;
-
-         put32((UCHAR FAR *)ic, 2UL);                /* INIT_EXTENDED_CFG_CMD: init_flags = BIT(IWL_INIT_NVM)   */
-         if (iwl_cmd1(WIDE_ID(SYSTEM_GROUP, 3), (UCHAR FAR *)ic, 4))
-            return fail("AX200 stage 2: INIT_EXTENDED_CFG_CMD failed", 0UL);
-         step(0x31);
-         if (iwl_nvm_init_22000())
-            return fail("AX200 stage 3: NVM_GET_INFO failed", 0UL);
-         step(0x34);
-         put32((UCHAR FAR *)nc, 0UL);                /* NVM_ACCESS_COMPLETE (REGULATORY_AND_NVM_GROUP 0x0C)      */
-         if (iwl_cmd1(WIDE_ID(0x0C, 0), (UCHAR FAR *)nc, 4))
-            return fail("AX200 stage 2: NVM_ACCESS_COMPLETE failed", 0UL);
-         step(0x32);
-         g_init_complete = 0;
-         t0 = dd_ms();
-         while (!g_init_complete) {
-            hw_wait(&g_init_complete, 100);
-            if (g_fw_error)
-               return fail("AX200 stage 2: firmware error while waiting for INIT_COMPLETE", g_err_table);
-            if ((long)(dd_ms() - t0) > 3000L)
-               return fail("AX200 stage 2: no INIT_COMPLETE_NOTIF", 0UL);
-         }
-      }
+   if (g_cfg->family == IWL_FAM_22000) {           /* AX200: the unified firmware is started twice, as Linux does (iwl_mvm_start_get_nvm, then iwl_mvm_up) */
+      if (ax200_unified(1))
+         return -1;
       step(0x33);
-      /* stage 4: the runtime set-up of iwl_mvm_up for a unified image, in the same firmware instance (no second start) */
+      iwl_stop_device();
+      if (iwl_start_hw())
+         return fail("AX200: the adapter could not be restarted after the NVM read", iwl_rd(CSR_GP_CNTRL));
+      if (ax200_unified(0))
+         return -1;
+      step(0x39);
+      /* stage 4: the runtime set-up of iwl_mvm_up for a unified image (in the second firmware start) */
+      iwl_send_sf(SF_INIT_OFF, 0);                    /* Smart FIFO (Linux ignores a failure)                       */
       if (send_tx_ant())
          return fail("AX200 stage 4: TX_ANT_CONFIGURATION failed", 0UL);
       if (send_bt_init())
