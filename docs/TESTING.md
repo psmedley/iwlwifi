@@ -385,3 +385,11 @@ firmware 50 boots like 77 (`ALIVENTF len=0074`), the first three commands answer
 Linux does not send it in the first start: it stops the device after the NVM read and starts the unified firmware a second time (`iwl_mvm_start_get_nvm` then `iwl_mvm_up`), and the
 runtime commands go to that second instance; I had skipped the restart. The MAC address (`HWMAC=...8B`) was read from the wrong CSR (0x08 is `CSR_INT`); the straps are at 0x388 / 0x38C
 (OTP 0x380 / 0x384). Both fixed in the next build.
+
+**AX200, later tests (builds 1939247 to 20f75bb): scanning works (24 networks listed).** The crashes were all command-format problems, found by reading OpenBSD `iwx`:
+1. Firmware API >= 50 rejects group-0 commands (`BAD_COMMAND`, UMAC error id 0x38): they must be sent as `LONG_GROUP` (group 1) in the wide header.
+2. The auxiliary station queue (`SCD_QUEUE_CFG`) crashed the firmware and is not needed: `iwx` scans without an auxiliary station, so it is skipped.
+3. `SCAN_CFG_CMD` must be the 12-byte reduced form when API bit 56 is set (the old 36+ byte form is accepted, then the firmware asserts at the first scan).
+4. Scan request v9: `adwell_default_hb_n_aps` at byte 18; second-LMAC dwell values.
+5. `REPLY_RX_MPDU` must use the multi-queue descriptor parser for every family >= 9000 (the AX200 used the old parser: 96% "CRC failures").
+The start-up scan-variant harness (`SCANTRY`) is still in the build; it can be removed. Next: the data path (docs/NEXT.md).

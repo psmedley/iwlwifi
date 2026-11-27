@@ -77,7 +77,7 @@ static const iwl_dev_t g_devs[] = {
    /* 9000 family: not driven yet (multi-queue receive) */
    { 0x2526, 0xFFFF, &cfg_9260, "Intel(R) Wireless-AC 9260 (not supported yet)" },
    /* 22000 family: stage 1 (boot to ALIVE) only */
-   { 0x2723, 0xFFFF, &cfg_ax200, "Intel(R) Wi-Fi 6 AX200 (stage 4: scan)" },
+   { 0x2723, 0xFFFF, &cfg_ax200, "Intel(R) Wi-Fi 6 AX200 (scan only)" },
    { 0xA370, 0x4030, &cfg_9560, "Intel(R) Wireless-AC 9560 160MHz (experimental)" },
    { 0xA370, 0xFFFF, &cfg_9560, "Intel(R) Wireless-AC 9560 CNVi (experimental)" },   /* Cannon Lake PCH CNVi */
    { 0x9DF0, 0xFFFF, &cfg_9560_x, "Intel(R) Wireless-AC 9560 CNVi (not supported yet)" },
