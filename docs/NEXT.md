@@ -42,3 +42,7 @@ That makes this family testable. It needs a separate transport (Linux `pcie/ctxt
 `rx.c` with `iwl_rx_transfer_desc`), the gen2 TFD format, a newer firmware API, and a decision on how much of 802.11ax and 6 GHz to
 support (a plain HT/VHT link first). Order of work: the 9560 (in progress), then this. Details to collect from the testers first:
 `lspci -nnv` (device and subsystem id), `dmesg | grep iwlwifi` (firmware file and version), and the firmware file itself.
+
+AX200 on the author's laptop (Dell XPS 13 7390, `8086:2723` rev 1a, subsystem `1a56:1653` Killer AX1650): Linux loads `iwlwifi-cc-a0-77.ucode`
+(version 77.8dbafb52.0; the file is 1,368,100 bytes with 50 runtime sections, no separate INIT image: a "unified" firmware, which
+confirms that the 22000 generation starts its NVM/INIT phase inside the runtime image, as Linux `iwl_run_unified_mvm_ucode` does).
