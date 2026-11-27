@@ -18,7 +18,7 @@ Add a line to `g_devs[]` in `iwl/iwl_cfg.c`:
 ```
 
 `subdev` `0xFFFF` matches any subsystem; more specific lines go first. The 8265 (`24FD`) is listed already and uses
-`iwlwifi-8265-36.ucode`; it is the same family (iwm treats it as 8000) and only needs testing.
+`iwlwifi-8265-36.ucode`; it is the same family (iwm treats it as 8000) and only needs testing (firmware file `bin/firmware/iwlwifi-8265-36.ucode` is included).
 
 ## 7000 family (7260, 3160, 7265, 3165, 3168)
 

@@ -16,3 +16,5 @@
 
 The combined work is distributed under GPL-2.0-only (`COPYING`); the ISC-licensed iwm parts are compatible with it.
 The firmware is not part of the GPL work: it is Intel's binary, redistributed unmodified under Intel's licence.
+
+- `bin/firmware/iwlwifi-8265-36.ucode`: linux-firmware `intel/iwlwifi/iwlwifi-8265-36.ucode` (gitlab.com/kernel-firmware/linux-firmware, main), unmodified, SHA-256 1336afcd028ed094d1fe33893c84c273bb5711be52970040344a75a12f276d56; Intel firmware under `LICENCE.iwlwifi_firmware`.
