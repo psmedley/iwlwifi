@@ -176,7 +176,7 @@ int iwl_fw_parse(void)
       }
       pos += (tlen + 3) & ~3UL;
    }
-   if (!g_fw.img[UCODE_INIT].nsec || !g_fw.img[UCODE_REGULAR].nsec) {
+   if (!g_fw.img[UCODE_REGULAR].nsec || (!g_fw.img[UCODE_INIT].nsec && (!g_cfg || g_cfg->family != IWL_FAM_22000))) {   /* the 22000 family has one image */
       dd_err("firmware file has no INIT or runtime image", (ULONG)g_fw.img[UCODE_INIT].nsec);
       return -5;
    }

@@ -341,3 +341,14 @@ the primary channel's position in the 80 MHz block agrees with the 40 MHz second
 **9560, thirteenth test (build 34c33ca, `r3`): 80 MHz works.** `LINK=JOINED 88 ... VHT80 NSS=2` on 5 GHz channel 136 (`rate=4400F019`: VHT, 80 MHz, two streams, MCS 9, short GI):
 download **15.4 MB/s**, upload over SMB **14.4 MB/s** (about the wired OS/2 machine's 15 MB/s, and well above the 8260's 10.5 MB/s at HT40).
 Receive aggregation `sessions=0002`, transmit aggregation ACTIVE, no firmware errors, `HWERR=0000`.
+
+## 8. Intel Wi-Fi 6 AX200 (22000 family), stage 1: boot to ALIVE
+
+`8086:2723` (Killer AX1650w subsystem `1a56:1653` and the others). Copy `bin\firmware\iwlwifi-cc-a0-77.ucode` (uncompressed) instead of the other
+firmware files, the usual `copy /b ... \DEV\WRND32$` line. What is written: the gen2 start-up (as Linux `iwl_trans_pcie_gen2_start_fw`): persistence bit,
+MSI mode, the context information (14 LMAC, 15 UMAC and 19 paging sections of this file, about 1.35 MB copied into memory), the command-queue ring
+(32 TFH descriptors) and the receive rings described to the firmware, the free buffers announced when the ALIVE interrupt arrives.
+**Nothing after ALIVE is written**, so a successful stage 1 ends in a status that says `LASTERR=AX200 stage 1 done: the firmware sent ALIVE ...`.
+What to send back: the status text, in particular `STATE=`, `LASTERR=`, `CTXINFO lmac=0E umac=0F paging=13 ... fail=0000`, `ALIVENTF len= first16=`
+(length 68 or 116 and the first bytes of the notification: `FECA` first means status 0xCAFE = OK), `INTCAUSES`, `MQRX`, `PERSIST`, `CSR_INT`, `ERRTBL`, `SCHED`.
+Failure codes in the message: 3 a section did not load, 4 no ALIVE, 5 the context information could not be built (`CTXINFO fail=` says which section).

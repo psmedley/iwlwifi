@@ -258,8 +258,10 @@ int iwl_trans_alloc(void)
    for (i = 0; i < RX_NBUF / 16; i++)
       if ((g_rxblk[i] = dma_big_al(0x10000UL, 4096)) == 0UL)
          return -5;
-   if (g_cfg->family == IWL_FAM_9000 && iwl9_alloc())
+   if ((g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000) && iwl9_alloc())
       return -6;
+   if (g_cfg->family == IWL_FAM_22000 && iwl22_alloc())
+      return -7;
    g_resp = DPTR(g_respbuf);
    g_alloc_done = 1;
    return 0;
@@ -279,7 +281,7 @@ static void reset_rings(void)
    fmemset(DPTR(g_sched), 0, (USHORT)(IWL_MAX_QUEUES * TFD_QUEUE_BC_SIZE * 2));
    fmemset(DPTR(g_rbstat), 0, 16);
    g_rxcur = 0;
-   if (g_cfg->family == IWL_FAM_9000)
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000)
       iwl9_reset();
 }
 
@@ -426,7 +428,7 @@ static void rx_service(void)
 
    if (!g_trans_on)
       return;
-   if (g_cfg->family == IWL_FAM_9000) {           /* multi-queue receive                                    */
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000) {   /* multi-queue receive              */
       iwl9_rx_service();
       return;
    }
@@ -485,8 +487,10 @@ static void service_once(void)
          if (r1 & (CSR_INT_BIT_FH_RX | CSR_INT_BIT_SW_RX))
             mmio_wr8(CSR_INT_PERIODIC_REG, CSR_INT_PERIODIC_ENA);
       }
-      if (r1 & CSR_INT_BIT_ALIVE)
-         ;                                        /* the ALIVE packet in the receive ring is what counts   */
+      if (r1 & CSR_INT_BIT_ALIVE) {
+         if (g_cfg->family == IWL_FAM_22000)
+            iwl22_alive_restock();                /* gen2: the firmware has programmed the RFH: announce the free buffers */
+      }
    }
    rx_service();
    sta_rx_tick();                                 /* block-ack reorder buffers: frames that waited too long   */
@@ -577,6 +581,8 @@ static int apm_init(void)
    /* L0s is unstable on these devices; the driver turned ASPM off in PCI configuration space (pci_enable),
     * so the device is told L0s is disabled (Linux iwl_pcie_apm_config: CSR_GIO_REG_VAL_L0S_DISABLED). */
    iwl_set(CSR_GIO_REG, CSR_GIO_REG_VAL_L0S_DISABLED);
+   if (g_cfg->family == IWL_FAM_22000)            /* bisr_workaround: the TOP FSM may still be in the previous reset */
+      dd_msleep(2);
    iwl_set(CSR_GP_CNTRL, CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
    if (g_cfg->family == IWL_FAM_8000)
       dd_iodelay(2);
@@ -584,6 +590,8 @@ static int apm_init(void)
       dd_err("timeout waiting for the MAC clock, GP_CNTRL", iwl_rd(CSR_GP_CNTRL));
       return -1;
    }
+   if (g_cfg->family == IWL_FAM_22000)
+      dd_iodelay(200);                            /* bisr_workaround: BISR shift to finish                  */
    if (g_cfg->family == IWL_FAM_7000) {          /* DMA clock, L1-Active off, RF-kill interrupt in APMG   */
       iwl_prph_wr(PRPH_APMG_CLK_EN_REG, 0x00000200UL);   /* APMG_CLK_VAL_DMA_CLK_RQT                       */
       dd_iodelay(20);
@@ -619,7 +627,7 @@ static void clear_persistence_bit(void)
    g_hpm = prph_rd_unlocked(0xA03440UL);
    g_wprot = 0UL;
    if (g_hpm != 0xA5A5A5A0UL && (g_hpm & 0x1000UL)) {
-      g_wprot = prph_rd_unlocked(0xA04CE0UL);        /* PREG_PRPH_WPROT_9000                                   */
+      g_wprot = prph_rd_unlocked(g_cfg->family == IWL_FAM_22000 ? 0xA04D00UL : 0xA04CE0UL);   /* PREG_PRPH_WPROT_22000 / _9000 */
       if (g_wprot & 0x1000UL)
          dd_err("cannot clear the persistence bit (write protected)", g_wprot);
       else
@@ -633,13 +641,13 @@ int iwl_start_hw(void)
       dd_err("the adapter did not become ready (owned by the management engine?)", iwl_rd(CSR_HW_IF_CONFIG_REG));
       return -1;
    }
-   if (g_cfg->family == IWL_FAM_9000)
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000)
       clear_persistence_bit();
    iwl_wr(CSR_RESET, CSR_RESET_REG_FLAG_SW_RESET);
    dd_msleep(5);
    if (apm_init())
       return -2;
-   if (g_cfg->family == IWL_FAM_9000)              /* multi-queue receive hardware: interrupts as MSI / legacy (UREG_CHICK) */
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000)   /* multi-queue receive hardware: interrupts as MSI / legacy (UREG_CHICK) */
       iwl_prph_wr(0xA05C00UL, 0x01000000UL);       /* UREG_CHICK_MSI_ENABLE                                  */
    g_trans_on = 1;
    enable_rfkill_int();
@@ -673,8 +681,10 @@ void iwl_stop_device(void)
       }
       iwl_nic_unlock();
    }
-   if (g_cfg->family == IWL_FAM_9000)
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000)
       iwl9_rx_stop();
+   if (g_cfg->family == IWL_FAM_22000)
+      iwl22_free_all();
    reset_rings();
    if (g_cfg->family == IWL_FAM_7000) {
       iwl_prph_wr(0x3008UL, 0x00000200UL);       /* APMG_CLK_DIS_REG: DMA clock off                        */
@@ -738,6 +748,11 @@ static int nic_init(void)
    if (g_cfg->family == IWL_FAM_7000)
       iwl_prph_wr(PRPH_APMG_PS_CTRL_REG, (iwl_prph_rd(PRPH_APMG_PS_CTRL_REG) & ~0x03000000UL));   /* VMAIN */
    nic_config();
+   if (g_cfg->family == IWL_FAM_22000) {          /* gen2: no scheduler or ring registers; the command queue is described in the context information */
+      iwl22_rx_init();
+      iwl_set(CSR_MAC_SHADOW_REG_CTRL, 0x800FFFFFUL);
+      return 0;
+   }
    if (g_cfg->family == IWL_FAM_9000)
       iwl9_rx_init();
    else
@@ -866,7 +881,7 @@ int iwl_load_ucode(USHORT type)
 {
    g_alive = g_alive_ok = 0;
    g_fw_error = 0;
-   if (g_cfg->family == IWL_FAM_9000)             /* Linux iwl_trans_pcie_start_fw: prepare the card again (sets the OS_ALIVE mailbox bit, cleared by the reset) */
+   if (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000)   /* Linux iwl_trans_pcie_start_fw: prepare the card again (sets the OS_ALIVE mailbox bit, cleared by the reset) */
       iwl_prepare_card_hw();
    iwl_wr(CSR_INT, 0xFFFFFFFFUL);
    if (nic_init()) {
@@ -879,17 +894,22 @@ int iwl_load_ucode(USHORT type)
    set_mask(CSR_INT_BIT_FH_TX);                   /* only the chunk-done interrupt while loading           */
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
    iwl_wr(CSR_UCODE_DRV_GP1_CLR, CSR_UCODE_SW_BIT_RFKILL);
-   if (g_cfg->family == IWL_FAM_7000) {
+   if (g_cfg->family == IWL_FAM_22000) {          /* the context-info boot (iwl_gen2.c) */
+      if (iwl22_boot(type))
+         return -5;
+   } else if (g_cfg->family == IWL_FAM_7000) {
       if (load_firmware_7000(type))
          return -3;
    } else if (g_cfg->family != IWL_FAM_8000 && g_cfg->family != IWL_FAM_9000)
       return -2;
    else if (load_firmware_8000(type))             /* 8000 and 9000: the secured CPU1 / CPU2 sections          */
       return -3;
-   if (hw_wait(&g_alive, (USHORT)(g_cfg->family == IWL_FAM_9000 ? 3000 : 1000)) || !g_alive_ok) {
+   if (hw_wait(&g_alive, (USHORT)(g_cfg->family >= IWL_FAM_9000 ? 3000 : 1000)) || !g_alive_ok) {
       dd_err(g_alive ? "firmware ALIVE with bad status" : "no ALIVE from the firmware", iwl_rd(CSR_INT));
       return -4;
    }
+   if (g_cfg->family == IWL_FAM_22000)
+      iwl22_free_images();
    return 0;
 }
 

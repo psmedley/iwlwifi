@@ -51,6 +51,35 @@ static void prph64(ULONG reg, ULONG v)
    iwl_prph_wr(reg + 4UL, 0UL);
 }
 
+ULONG iwl9_fbd_phys(void) { return g_fbd.phys; }
+ULONG iwl9_ubd_phys(void) { return g_ubd.phys; }
+
+/* gen2 (22000 family): the rings are only described in the context information; the firmware programs the RFH itself and the
+ * free ring is announced when the ALIVE interrupt arrives (Linux iwl_pcie_gen2_rx_init, iwl_pcie_rxmq_restock at ALIVE) */
+void iwl22_rx_init(void)
+{
+   UCHAR FAR *d;
+   USHORT i;
+
+   iwl9_reset();
+   fmemset(iwl_rbstat_ptr(), 0, 16);
+   d = DPTR(g_fbd);
+   for (i = 0; i < RX_NBUF; i++) {
+      put32(d + i * 8, iwl_rxbuf_phys(i) | (ULONG)(i + 1));
+      put32(d + i * 8 + 4, 0UL);
+   }
+   g_mq_wr = RX_NBUF;
+   g_mq_wra = 0;
+   g_mq_bufs = RX_NBUF;
+   mmio_wr8(CSR_INT_COALESCING, HOST_INT_TIMEOUT_DEF);
+}
+
+void iwl22_alive_restock(void)
+{
+   g_mq_wra = (USHORT)(g_mq_wr & ~7);
+   iwl_wr(RFH_Q_FRBDCB_WIDX_TRG, (ULONG)g_mq_wra);
+}
+
 /* iwl_pcie_rx_mq_hw_init + the first restock: RX_NBUF buffers of 4 KB, buffer id = index + 1 */
 void iwl9_rx_init(void)
 {

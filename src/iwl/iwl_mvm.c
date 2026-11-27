@@ -13,6 +13,8 @@
 USHORT g_hw_ready, g_hw_failed, g_hw_state;
 UCHAR  g_hw_mac[6], g_hw_nss = 1;
 USHORT g_init_complete, g_calib_complete;
+USHORT g_alive_len;                             /* length of the ALIVE notification (22000 family)           */
+UCHAR  g_alive_hdr[16];
 static USHORT g_unhandled, g_last_unhandled, g_fw_errors_seen;
 static USHORT g_unh_qid, g_unh_idx, g_unh_len, g_unh_by[256];
 static UCHAR  g_unh_d[8];
@@ -266,7 +268,14 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    (void)idx;
    switch (code) {
    case CMD_ALIVE:
-      if (len == sizeof(alive_v3_t)) {
+      if (g_cfg->family == IWL_FAM_22000 && (len == 68 || len == 116)) {   /* mvm_alive_resp v3 / v4: status, flags, lmac (48 bytes, twice with two), umac */
+         g_alive_len = len;
+         g_err_table = get32(p + 20);
+         g_sched_base = get32(p + 40);
+         g_umac_err_table = get32(p + (len == 68 ? 60 : 108));
+         g_alive_ok = (USHORT)(get16(p) == 0xCAFE);
+         fmemcpy((UCHAR FAR *)g_alive_hdr, p, 16);
+      } else if (len == sizeof(alive_v3_t)) {
          alive_v3_t FAR *a = (alive_v3_t FAR *)p;
 
          g_err_table = a->error_event_table_ptr;
@@ -470,6 +479,12 @@ int hw_up(void)
    if (g_rfkill)
       return fail("the radio is switched off (hardware RF kill)", iwl_rd(CSR_GP_CNTRL));
    step(8);
+   if (g_cfg->family == IWL_FAM_22000) {           /* AX200, stage 1: boot the (unified) firmware to ALIVE, then stop and report */
+      if ((rc = iwl_load_ucode(UCODE_REGULAR)) != 0)
+         return fail("the AX200 firmware did not start (code: 3 load, 4 no ALIVE, 5 context information)", (ULONG)(USHORT)(-rc));
+      step(0x30);
+      return fail("AX200 stage 1 done: the firmware sent ALIVE; the rest (queues, NVM, commands) is not written yet", g_sched_base);
+   }
    if (run_init_image())
       return -1;
    step(0x20);
@@ -612,7 +627,16 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
    ps(" CRC="); ph(g_rx_crc, 4); ps(" DECFAIL="); ph(g_rx_decfail, 4); ps(" TXOK="); ph(g_tx_ok, 4);
    ps(" TXFAIL="); ph(g_tx_fail, 4); ps(" TXQ="); ph(iwl_txq_queued(QI_BE), 2); nl();
    ps("POWER save="); ph(g_powersave, 1); nl();
-   if (g_cfg && g_cfg->family == IWL_FAM_9000)
+   if (g_cfg && g_cfg->family == IWL_FAM_22000) {
+      USHORT k;
+
+      iwl22_status(ps, ph, nl);
+      ps("ALIVENTF len="); ph(g_alive_len, 4); ps(" first16=");
+      for (k = 0; k < 16; k++)
+         ph(g_alive_hdr[k], 2);
+      nl();
+   }
+   if (g_cfg && (g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000))
       iwl9_status(ps, ph, nl);
    rs_status(ps, ph, nl);
    txa_status(ps, ph, nl);

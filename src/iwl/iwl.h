@@ -18,6 +18,7 @@
 #define IWL_FAM_7000    1                       /* 7260, 3160, 7265, 3165, 3168                         */
 #define IWL_FAM_8000    2                       /* 8260, 8265, 4165                                     */
 #define IWL_FAM_9000    3                       /* 9260, 9461, 9462, 9560                               */
+#define IWL_FAM_22000   4                       /* AX200 (gen2 transport: context information, TFH descriptors) */
 
 #define IWL_NVM         0                       /* NVM layouts (iwm: nvm_type)                           */
 #define IWL_NVM_EXT     1
@@ -275,7 +276,7 @@ extern char *g_devname;
 
 #define UCODE_REGULAR           0
 #define UCODE_INIT              1
-#define UCODE_SECT_MAX          16
+#define UCODE_SECT_MAX          64
 #define CPU1_CPU2_SEPARATOR_SECTION 0xFFFFCCCCUL
 #define PAGING_SEPARATOR_SECTION    0xAAAABBBBUL
 
@@ -891,6 +892,15 @@ extern ULONG g_int_seen;
 extern USHORT g_int_alive, g_int_rx, g_int_fhtx, g_int_other;
 extern ULONG g_hpm, g_wprot;                    /* 9000: HPM_DEBUG and the write-protect word at start-up    */
 int    iwl9_alloc(void);
+void   iwl22_rx_init(void);                     /* AX200 (22000 family): rings described to the firmware, no RFH programming */
+void   iwl22_alive_restock(void);
+ULONG  iwl9_fbd_phys(void);
+ULONG  iwl9_ubd_phys(void);
+int    iwl22_alloc(void);                       /* iwl_gen2.c */
+int    iwl22_boot(USHORT type);
+void   iwl22_free_all(void);
+void   iwl22_free_images(void);
+void   iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
 void   iwl9_reset(void);
 void   iwl9_rx_init(void);
 void   iwl9_rx_service(void);

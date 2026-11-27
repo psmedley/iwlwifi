@@ -9,7 +9,7 @@ CFLAGS = -bt=os2 -2 -obilmr -s -ze -zl -zq -zff -zgf -ms -wx -zp1 -zu -j -i=os2 
 ASM    = hdr lib ndisx end
 OS2C   = strat pci mem ndis genmac dbg
 WLANC  = sta
-IWLC   = iwl_cfg iwl_fw iwl_trans iwl_mvm iwl_nvm iwl_phydb iwl_scan iwl_agg iwl_ctxt iwl_mac
+IWLC   = iwl_cfg iwl_fw iwl_trans iwl_mvm iwl_nvm iwl_phydb iwl_scan iwl_agg iwl_ctxt iwl_gen2 iwl_mac
 HDRS   = os2/drv.h os2/os2dd.h os2/ndis.h wlan/hw.h wlan/wlan.h iwl/iwl.h
 
 OBJS   = $(addprefix obj/,$(addsuffix .obj,$(ASM) $(OS2C) $(WLANC) $(IWLC)))

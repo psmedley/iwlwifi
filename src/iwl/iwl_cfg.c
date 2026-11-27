@@ -54,6 +54,7 @@ static const iwl_cfg_t cfg_7265 = { IWL_FAM_7000, IWL_NVM,     0, 1, 16384U, "iw
 static const iwl_cfg_t cfg_3168 = { IWL_FAM_7000, IWL_NVM_SDP, 0, 0, 16384U, "iwlwifi-3168-29.ucode" };
 static const iwl_cfg_t cfg_9560 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };   /* CNVi, "Jefferson Peak" radio */
 static const iwl_cfg_t cfg_9560_x = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };
+static const iwl_cfg_t cfg_ax200 = { IWL_FAM_22000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-cc-a0-77.ucode", 0 };
 static const iwl_cfg_t cfg_9260 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9260-th-b0-jf-b0-46.ucode" };
 
 static const iwl_dev_t g_devs[] = {
@@ -75,6 +76,8 @@ static const iwl_dev_t g_devs[] = {
    { 0x24FB, 0xFFFF, &cfg_3168, "Intel(R) Wireless 3168 (not supported yet)" },
    /* 9000 family: not driven yet (multi-queue receive) */
    { 0x2526, 0xFFFF, &cfg_9260, "Intel(R) Wireless-AC 9260 (not supported yet)" },
+   /* 22000 family: stage 1 (boot to ALIVE) only */
+   { 0x2723, 0xFFFF, &cfg_ax200, "Intel(R) Wi-Fi 6 AX200 (stage 1: boot only)" },
    { 0xA370, 0x4030, &cfg_9560, "Intel(R) Wireless-AC 9560 160MHz (experimental)" },
    { 0xA370, 0xFFFF, &cfg_9560, "Intel(R) Wireless-AC 9560 CNVi (experimental)" },   /* Cannon Lake PCH CNVi */
    { 0x9DF0, 0xFFFF, &cfg_9560_x, "Intel(R) Wireless-AC 9560 CNVi (not supported yet)" },

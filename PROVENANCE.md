@@ -10,6 +10,7 @@
 | Structure sizes asserted in `iwl_cfg.c` | computed by compiling OpenBSD's definitions with gcc | - |
 | `bin/firmware/iwlwifi-9000-pu-b0-jf-b0-46.ucode` | linux-firmware `intel/iwlwifi/iwlwifi-9000-pu-b0-jf-b0-46.ucode` (SHA-256 `9a0c5d938646942f9798e6212579c25771e4bb44301cd409b82abe361ca2c3e0`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
 | `bin/firmware/iwlwifi-7265D-29.ucode`, `iwlwifi-7265-17.ucode` | linux-firmware `intel/iwlwifi/` (SHA-256 `c52bcaa0...617e` and `91f69930...e870`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
+| `bin/firmware/iwlwifi-cc-a0-77.ucode` | linux-firmware `intel/iwlwifi/iwlwifi-cc-a0-77.ucode` (SHA-256 `19db22bb...d335`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
 | `bin/firmware/iwlwifi-8000C-36.ucode` | linux-firmware `intel/iwlwifi/iwlwifi-8000C-36.ucode` (SHA-256 `479931721f5e168d69d67c297c11738acd75da390adb94f96030a1055f4cf57a`) | Intel, `bin/firmware/LICENCE.iwlwifi_firmware` |
 
 The combined work is distributed under GPL-2.0-only (`COPYING`); the ISC-licensed iwm parts are compatible with it.
