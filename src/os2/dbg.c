@@ -10,6 +10,7 @@
  * Reading \DEV\WRND32$ returns the driver state as KEY=VALUE lines, then end of file.
  */
 #include "drv.h"
+extern ULONG g_authmode, g_encstat;
 
 ULONG g_last_err;
 char *g_last_err_txt = "";
@@ -307,6 +308,7 @@ static void build_status(void)
    ps("LINK="); ps(g_joined ? "JOINED " : "none "); ph(g_jch, 2); ps(" AID="); ph(g_jaid, 4);
    ps(" JFAIL="); ph(g_jfail, 2); ps(g_open_net ? " OPEN" : " RSN"); ps(g_ptk_on ? " PTK" : " nokey");
    ps(g_authorized ? " AUTHORIZED" : ""); ps(g_jht ? (g_j80 ? " VHT80" : (g_j40 ? " HT40" : " HT20")) : " legacy"); ps(" NSS="); ph(g_jnss, 1); ps(" SCO="); ph(g_jsco, 1); nl();
+   ps("SEC authmode="); ph(g_authmode, 8); ps(" encstat="); ph(g_encstat, 8); ps(" (a join needs 7/6 = WPA2-PSK CCMP, or 0 or 2 / 1 = open)"); nl();
    ps("WIDTH maxwidth="); ph(g_maxw, 1);
    if (g_jnet) {
       ps(" ap: vhtcaps="); ph(g_jnet->vht, 1); ps(" vht80="); ph(g_jnet->vhtw, 1); ps(" centre="); ph(g_jnet->vcf0, 2);

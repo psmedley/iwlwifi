@@ -89,7 +89,8 @@ static ULONG rd32(UCHAR FAR *p)
    return u.l;
 }
 
-static ULONG g_infra = 1, g_authmode, g_encstat;
+static ULONG g_infra = 1;
+ULONG g_authmode, g_encstat;               /* what the supplicant set (status text: SEC) */
 static UCHAR g_wbssid[6];                      /* BSSID the supplicant asked for (OID_802_11_BSSID)             */
 static UCHAR g_wany = 1;                       /* ...or ff:ff:ff:ff:ff:ff = any                                  */
 static UCHAR g_pj;                             /* a (re)join is pending, done by a later request                  */
