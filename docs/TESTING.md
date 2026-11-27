@@ -370,3 +370,12 @@ then the runtime phase of the unified firmware and the data queues.
 (`REGULATORY_AND_NVM_GROUP` 0x0C command 2; answer: version, SKU flags, TX / RX chains, LAR, 32-bit channel flags) and takes the MAC address from the strap registers at CSR 0x08 / 0x0C.
 Success: `LASTERR=AX200 stage 3 done ...` with `MAC=` filled in and the `NVM ver= chans= 5G= 11n= 11ac= txant= rxant= LAR=` line. Still to write for this family: restart into the runtime phase
 (the unified firmware is started a second time without reading the NVM), the gen2 queue creation command, the gen2 transmit command and status, then the commands the 9560 path already sends (PHY, MAC, station, scan) in their newer versions.
+
+**AX200, fourth build (stages 3 and 4, firmware 50): to a driver that scans.** The command versions the firmware accepts are listed in its `CMD_VERSIONS` table; firmware 77 (the
+file used in the first tests) asks for newer versions than the Linux 5.4 sources this port is based on (scan v15, PHY context v4, queue command v3 ...), firmware 50 is the newest that
+Linux 5.4 loads, so the AX200 now uses `iwlwifi-cc-a0-50.ucode` (copy that file, uncompressed, instead of the 77). New in this build, after the INIT phase and `NVM_GET_INFO`
+(MAC address from the CSR strap, 26 channels...): `TX_ANT_CONFIGURATION`, the BT command, the auxiliary station and its queue (`ADD_STA`, then `SCD_QUEUE_CFG` in the data-path group
+with a ring of 16 TFH descriptors and a byte-count table; the answer gives the queue number: `TXQ22 last= wptr=` in the status), PHY context, power, regulatory (MCC), scan
+configuration, then `STATE=0064 READY`: scanning works, **joining does not yet** (no data queues, no transmit command, no rate-scaling offload command). A scan is `echo scan > \DEV\WRND32$`
+or the Wireless LAN Monitor; networks appear in the `NET=` lines.
+The code segment is at 57 KB of the 64 KB a small-model driver can have; the data path of this family will need the medium memory model (several code segments) or a trimmed status output.

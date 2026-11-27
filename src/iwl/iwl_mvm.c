@@ -157,18 +157,25 @@ static int add_aux_sta(void)
                                    0x800UL, 0x1000UL, 0x2000UL, 0x4000UL, 0x8000UL };
    int rc;
 
-   if (iwl_enable_txq(AUX_STA_ID, qid, TX_FIFO_MCAST, MAX_TID_COUNT))
+   if (g_cfg->family != IWL_FAM_22000 && iwl_enable_txq(AUX_STA_ID, qid, TX_FIFO_MCAST, MAX_TID_COUNT))
       return -1;
    fmemset((UCHAR FAR *)&c, 0, sizeof(c));
    c.sta_id = AUX_STA_ID;
    if (FW_API(API_STA_TYPE))
       c.station_type = STA_AUX_ACTIVITY;
    c.mac_id_n_color = ID_AND_COLOR(MAC_INDEX_AUX, 0);
-   c.tfd_queue_msk = qbit[qid];
+   if (g_cfg->family != IWL_FAM_22000)            /* gen2: queues are created by a command, after the station exists */
+      c.tfd_queue_msk = qbit[qid];
    c.tid_disable_tx = 0xFFFF;
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
    if (rc == 0 && (st & 0xFF) != ADD_STA_SUCCESS)
       rc = -2;
+   if (rc == 0 && g_cfg->family == IWL_FAM_22000) {
+      USHORT q;
+
+      if (iwl22_txq_alloc(AUX_STA_ID, MAX_TID_COUNT, 16, &q))   /* the auxiliary station's queue, 16 descriptors */
+         rc = -3;
+   }
    return rc;
 }
 
@@ -509,7 +516,35 @@ int hw_up(void)
          }
       }
       step(0x33);
-      return fail("AX200 stage 3 done: ALIVE, INIT phase and NVM_GET_INFO (MAC, channels); the runtime phase, queues and data are not written yet", g_sched_base);
+      /* stage 4: the runtime set-up of iwl_mvm_up for a unified image, in the same firmware instance (no second start) */
+      if (send_tx_ant())
+         return fail("AX200 stage 4: TX_ANT_CONFIGURATION failed", 0UL);
+      if (send_bt_init())
+         tstr("[iwl: BT coexistence command refused]");
+      step(0x35);
+      if (add_aux_sta())
+         return fail("AX200 stage 4: the auxiliary station or its queue could not be created", (ULONG)g_q22_fail);
+      step(0x36);
+      if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
+         return fail("AX200 stage 4: PHY context add failed", 0UL);
+      if (iwl_send_power())
+         return fail("AX200 stage 4: POWER_TABLE failed", 0UL);
+      step(0x37);
+      if (FW_CAPA(CAPA_LAR_SUPPORT) && send_mcc())
+         tstr("[iwl: MCC update refused]");
+      if (iwl_scan_config())
+         return fail("AX200 stage 4: scan configuration failed", 0UL);
+      step(0x38);
+      iwl_mac_reset();
+      if (!g_cfgmac) {
+         fmemcpy((UCHAR FAR *)g_mymac, (UCHAR FAR *)g_hw_mac, 6);
+         ndis_set_mac(g_mymac);
+      }
+      g_hw_nss = (UCHAR)(((iwl_valid_rx_ant() & 3) == 3) ? 2 : 1);
+      step(0x64);
+      g_hw_ready = 1;                                /* scanning works; there are no data queues yet: no join */
+      tstr("[iwl: AX200 ready for scanning, firmware "); tstr(g_fw.version); tstr("]"); tnl();
+      return 0;
    }
    if (run_init_image())
       return -1;

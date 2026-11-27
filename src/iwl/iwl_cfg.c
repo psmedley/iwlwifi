@@ -54,7 +54,7 @@ static const iwl_cfg_t cfg_7265 = { IWL_FAM_7000, IWL_NVM,     0, 1, 16384U, "iw
 static const iwl_cfg_t cfg_3168 = { IWL_FAM_7000, IWL_NVM_SDP, 0, 0, 16384U, "iwlwifi-3168-29.ucode" };
 static const iwl_cfg_t cfg_9560 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };   /* CNVi, "Jefferson Peak" radio */
 static const iwl_cfg_t cfg_9560_x = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };
-static const iwl_cfg_t cfg_ax200 = { IWL_FAM_22000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-cc-a0-77.ucode", 0 };
+static const iwl_cfg_t cfg_ax200 = { IWL_FAM_22000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-cc-a0-50.ucode", 0 };   /* the newest firmware API of Linux 5.4, on which the structures here are based */
 static const iwl_cfg_t cfg_9260 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9260-th-b0-jf-b0-46.ucode" };
 
 static const iwl_dev_t g_devs[] = {

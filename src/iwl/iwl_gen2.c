@@ -167,8 +167,57 @@ void iwl22_post(USHORT idx, ULONG phys, USHORT len)
       put16(t, 1);
 }
 
+/* A transmit queue, created by the firmware on request (Linux iwl_trans_pcie_dyn_txq_alloc, SCD_QUEUE_CFG in the data-path group): the host
+ * supplies a ring of TFH descriptors and a byte-count table; the answer is the queue number and its first write pointer. */
+USHORT g_q22_last, g_q22_wptr, g_q22_fail;
+ULONG  g_q22_ring, g_q22_bc;
+
+int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
+{
+   static UCHAR cfg[24];
+   ULONG  ring, bc;
+   UCHAR FAR *z;
+   USHORT i, sel;
+   int    rc;
+
+   ring = dma_big_al((ULONG)size * TFH_SIZE, 256);
+   bc = dma_big_al(640UL, 64);
+   if (!ring || !bc) {
+      g_q22_fail = 1;
+      return -1;
+   }
+   for (i = 0; i < (USHORT)(((ULONG)size * TFH_SIZE + 4095UL) / 4096UL); i++) {   /* zero the ring (physical memory is not cleared) */
+      sel = scr_map(SCR_D, ring + (ULONG)i * 4096UL, 4096);
+      if (!sel) { g_q22_fail = 2; return -2; }
+      fmemset((UCHAR FAR *)MAKEP(sel, 0), 0, 4096);
+   }
+   sel = scr_map(SCR_D, bc, 640);
+   if (!sel) { g_q22_fail = 2; return -2; }
+   z = (UCHAR FAR *)MAKEP(sel, 0);
+   fmemset(z, 0, 640);
+   fmemset((UCHAR FAR *)cfg, 0, sizeof(cfg));
+   cfg[0] = sta_id;
+   cfg[1] = tid;
+   put16((UCHAR FAR *)cfg + 2, 1);                          /* flags: TX_QUEUE_CFG_ENABLE_QUEUE                       */
+   put32((UCHAR FAR *)cfg + 4, (ULONG)(size == 16 ? 1 : (size == 32 ? 2 : (size == 64 ? 3 : (size == 128 ? 4 : 5)))));   /* log2(size) - 3 */
+   put64((UCHAR FAR *)cfg + 8, bc);                         /* byte_cnt_addr                                          */
+   put64((UCHAR FAR *)cfg + 16, ring);                      /* tfdq_addr                                              */
+   rc = iwl_cmd(WIDE_ID(DATA_PATH_GROUP, 0x17), (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
+   if (rc || g_resp_len < 8) {
+      g_q22_fail = 3;
+      return -3;
+   }
+   g_q22_last = get16(g_resp);                              /* queue_number                                           */
+   g_q22_wptr = get16(g_resp + 4);                          /* write_pointer                                          */
+   g_q22_ring = ring;
+   g_q22_bc = bc;
+   *qid = g_q22_last;
+   return 0;
+}
+
 void iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
 {
    ps("CTXINFO lmac="); ph(g_ctx_lm, 2); ps(" umac="); ph(g_ctx_um, 2); ps(" paging="); ph(g_ctx_pg, 2);
    ps(" dram="); ph(g_ctx_bytes, 8); ps(" fail="); ph(g_ctx_fail, 4); nl();
+   ps("TXQ22 last="); ph(g_q22_last, 2); ps(" wptr="); ph(g_q22_wptr, 4); ps(" ring="); ph(g_q22_ring, 8); ps(" fail="); ph(g_q22_fail, 2); nl();
 }
