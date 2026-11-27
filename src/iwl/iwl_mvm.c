@@ -555,6 +555,23 @@ static void ax200_autotest(void)
    g_scan_variant = 0;
 }
 
+/* AX200: end a link by restarting the firmware (the removal commands - station, binding, MAC, PHY context - made the firmware
+ * assert in field tests, with an error that has no documentation). Takes a few seconds; everything is rebuilt from scratch. */
+int hw_ax200_reset(void)
+{
+   ULONG t0 = dd_ms();
+
+   while ((long)(dd_ms() - t0) < 40L)               /* let a deauthentication frame leave first                     */
+      ;
+   g_hw_ready = 0;
+   iwl_mac_reset();
+   g_phy_on = 0;
+   iwl_stop_device();
+   if (iwl_start_hw() || ax200_unified(0) || ax200_runtime())
+      return -1;
+   return 0;
+}
+
 int hw_up(void)
 {
    USHORT ac;

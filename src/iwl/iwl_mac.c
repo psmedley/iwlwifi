@@ -679,6 +679,10 @@ int hw_join_complete(void)
 void hw_leave(void)
 {
    txa_reset();
+   if (g_cfg->family == IWL_FAM_22000) {          /* a clean restart instead of the removal commands */
+      hw_ax200_reset();
+      return;
+   }
    if (g_assoc_on) {
       iwl_send_sf(SF_INIT_OFF, 0);
       iwl_send_quota(0);
