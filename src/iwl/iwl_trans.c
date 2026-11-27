@@ -224,6 +224,8 @@ int iwl_trans_alloc(void)
    for (i = 0; i < 4; i++)
       g_txq[2 + i].qid = (USHORT)(g_dataq + i);
    g_txq[QI_AGG].qid = (USHORT)(dqa ? DQA_MIN_DATA_QUEUE : 0xFFFF);   /* transmit aggregation needs DQA firmware */
+   if (g_cfg->family == IWL_FAM_22000)
+      g_txq[QI_BE].qid = 0xFFFF;                   /* the firmware numbers the data queue when it creates it */
    if (g_alloc_done)
       return 0;
    if (dma_get_al(4096, 4096, &g_kw) ||
@@ -235,6 +237,10 @@ int iwl_trans_alloc(void)
        dma_get_al(32768U, 16, &g_fwdma))
       return -1;
    for (i = 0; i < QI_AGG; i++) {
+      if (g_cfg->family == IWL_FAM_22000) {          /* gen2: one data queue (the BE one), its ring comes from iwl_gen2.c */
+         g_txq[i].ok = (UCHAR)(i == 2);
+         continue;
+      }
       if (dma_get_al(TFD_QUEUE_SIZE_MAX * TFD_SIZE, 256, &g_txq[i].tfd))
          return -2;
       g_txq[i].ok = 1;
@@ -247,7 +253,7 @@ int iwl_trans_alloc(void)
    g_txq[2].slotsz = TX_SLOT_SZ;
    if (dma_get_al(TX_SLOTS * TX_SLOT_SZ, 64, &g_txq[2].buf))
       return -4;
-   if (dqa &&                                       /* the aggregation queue: a ring and its own slots; without memory the driver simply does not aggregate */
+   if (dqa && g_cfg->family != IWL_FAM_22000 &&     /* the aggregation queue: a ring and its own slots; without memory the driver simply does not aggregate */
        dma_get_al(TFD_QUEUE_SIZE_MAX * TFD_SIZE, 256, &g_txq[QI_AGG].tfd) == 0) {
       if (dma_get_al(TX_SLOTS * TX_SLOT_SZ, 64, &g_txq[QI_AGG].buf) == 0) {
          g_txq[QI_AGG].nslot = TX_SLOTS;
@@ -1010,6 +1016,26 @@ int iwl_enable_txq(USHORT sta, USHORT qid, USHORT fifo, USHORT tid)
    return iwl_cmd1(CMD_SCD_QUEUE_CFG, (UCHAR FAR *)&c, sizeof(c));
 }
 
+/* AX200: the firmware creates the data queue for the station (SCD_QUEUE_CFG); its number is whatever the firmware answers. */
+int iwl22_dataq_create(USHORT sta)
+{
+   txq_t *q = &g_txq[QI_BE];
+   USHORT qid;
+
+   if (iwl22_txq_alloc((UCHAR)sta, 15, 32, &qid))
+      return -1;
+   q->qid = qid;
+   q->cur = q->tail = q->queued = 0;
+   fmemset((UCHAR FAR *)q->busy, 0, TX_SLOTS);
+   return 0;
+}
+
+void iwl22_dataq_destroy(USHORT sta)
+{
+   iwl22_txq_free((UCHAR)sta, 15);
+   g_txq[QI_BE].qid = 0xFFFF;
+}
+
 /* ---- transmit descriptors -------------------------------------------------------------------------------- */
 static void tfd_set(txq_t *q, USHORT idx, USHORT ntb, ULONG FAR *addr, USHORT FAR *len)
 {
@@ -1272,7 +1298,7 @@ UCHAR FAR *iwl_txq_slot(USHORT qi, USHORT *idx, ULONG *phys)
    txq_t *q = &g_txq[qi];
    USHORT s;
 
-   if (!g_trans_on || !q->ok || !q->nslot || q->queued >= TX_SLOTS - 1)
+   if (!g_trans_on || !q->ok || !q->nslot || q->qid == 0xFFFF || q->queued >= TX_SLOTS - 1)
       return 0;
    s = (USHORT)(q->cur & (TX_SLOTS - 1));
    if (q->busy[s])
@@ -1293,6 +1319,14 @@ int iwl_txq_kick(USHORT qi, USHORT idx, USHORT cmdlen, USHORT paylen, USHORT tot
    static ULONG  a[3];
    static USHORT n[3];
 
+   if (g_cfg->family == IWL_FAM_22000) {          /* gen2: TFH ring of 32, doorbell with the queue id in bits 16 and up */
+      iwl22_data_tfd(idx, ph, cmdlen, paylen, totlen);
+      q->busy[s] = 1;
+      q->queued++;
+      q->cur = (USHORT)((q->cur + 1) & 31);
+      iwl_wr(HBUS_TARG_WRPTR, (ULONG)q->cur | ((ULONG)q->qid << 16));
+      return 0;
+   }
    a[0] = ph;       n[0] = 16;
    a[1] = ph + 16;  n[1] = (USHORT)(cmdlen - 16);
    a[2] = ph + 256; n[2] = paylen;

@@ -393,3 +393,7 @@ runtime commands go to that second instance; I had skipped the restart. The MAC 
 4. Scan request v9: `adwell_default_hb_n_aps` at byte 18; second-LMAC dwell values.
 5. `REPLY_RX_MPDU` must use the multi-queue descriptor parser for every family >= 9000 (the AX200 used the old parser: 96% "CRC failures").
 The start-up scan-variant harness (`SCANTRY`) is still in the build; it can be removed. Next: the data path (docs/NEXT.md).
+
+**AX200 data path (first build, untested):** one data queue created by `SCD_QUEUE_CFG` after `ADD_STA` (station id 0, TID 15, 32 TFH descriptors, queue number from the firmware's answer, doorbell `qid<<16 | wptr`),
+TX_CMD v7 (gen2 layout, hardware adds the CCMP header, `ENCRYPT_DIS` for unprotected frames, rate in every command from the host's rate ladder because there is no LQ_CMD),
+TX response status at byte 40, `ADD_STA` without a queue mask, `BINDING_CONTEXT_CMD` always 28 bytes. Aggregation, TLC offload and power save are not wired for this family yet.

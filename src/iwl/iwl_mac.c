@@ -206,7 +206,7 @@ static int binding(ULONG action)
    c.phy = ID_AND_COLOR(0, 0);
    c.lmac_id = (g_jch > 14 && FW_CAPA(CAPA_CDB_SUPPORT)) ? 1UL : 0UL;
    rc = iwl_cmd_status(CMD_BINDING_CONTEXT, (UCHAR FAR *)&c,
-                       (USHORT)(FW_CAPA(CAPA_BINDING_CDB_SUPPORT) ? sizeof(c) : 24), &st);
+                       (USHORT)((FW_CAPA(CAPA_BINDING_CDB_SUPPORT) || g_cfg->family == IWL_FAM_22000) ? sizeof(c) : 24), &st);
    return (rc == 0 && st != 0UL) ? -10 : rc;
 }
 
@@ -242,6 +242,11 @@ static int add_sta(USHORT update)
          c.station_flags |= STA_FLG_FAT_EN_40MHZ;
       c.station_flags |= (ULONG)(g_j80 ? g_jvexp : (g_ampdu_par & 3)) << STA_FLG_MAX_AGG_SIZE_SHIFT;
       c.station_flags |= (ULONG)((g_ampdu_par >> 2) & 7) << STA_FLG_AGG_MPDU_DENS_SHIFT;
+   }
+   if (g_cfg->family == IWL_FAM_22000) {           /* gen2: the queues are created by SCD_QUEUE_CFG, no queue mask, no TID disable */
+      c.tfd_queue_msk = 0;
+      c.modify_mask &= (USHORT)~(STA_MODIFY_QUEUES | STA_MODIFY_TID_DISABLE_TX);
+      c.tid_disable_tx = 0;
    }
    rc = iwl_cmd_status(CMD_ADD_STA, (UCHAR FAR *)&c, (USHORT)(FW_API(API_STA_TYPE) ? sizeof(c) : ADD_STA_CMD_V7_SIZE), &st);
    if (rc == 0 && (st & 0xFFUL) != ADD_STA_SUCCESS)
@@ -395,6 +400,12 @@ static void ladder_build(void)
    }
 }
 
+/* The rate_n_flags of a data frame on a device without LQ_CMD (AX200): the rung the rate control trusts. */
+ULONG rs_rate(void)
+{
+   return g_rs_cur < g_lad_n ? g_lad[g_rs_cur] : g_mgmt_rate;
+}
+
 /* LQ_CMD for the ladder starting at rung r (async: from the service path). */
 static int lq_send(USHORT r, USHORT async)
 {
@@ -402,6 +413,9 @@ static int lq_send(USHORT r, USHORT async)
    USHORT k;
    int    i, lowest = -1;
    UCHAR  hi = (UCHAR)(g_jch > 14);
+
+   if (g_cfg->family == IWL_FAM_22000)             /* the rate goes into every TX command instead              */
+      return 0;
 
    for (i = 0; i < 12; i++)                        /* the rest of the table: the lowest basic rate              */
       if ((i < 4 && !hi && (g_basic_cck & (1 << i))) || (i >= 4 && (g_basic_ofdm & (1 << (i - 4))))) {
@@ -561,6 +575,8 @@ int hw_join_prepare(net_t *n)
       return -5;
    g_sta_on = 1;
    g_pn_lo = 0;
+   if (g_cfg->family == IWL_FAM_22000 && iwl22_dataq_create(STATION_ID))
+      return -6;
    /* stay on the channel for association: up to about one second (Linux uses up to 1000 TU here) */
    if (time_event(1, 1000, (USHORT)(g_jbcn / 2)) == 0)
       g_te_on = 1;
@@ -622,6 +638,8 @@ void hw_leave(void)
       g_te_on = 0;
    }
    if (g_sta_on) {
+      if (g_cfg->family == IWL_FAM_22000)
+         iwl22_dataq_destroy(STATION_ID);
       rm_sta();
       g_sta_on = 0;
    }
@@ -767,6 +785,29 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
       hdr[23] = (UCHAR)(sn >> 4);
    }
    pad = (USHORT)((4 - (hlen & 3)) & 3);
+   if (g_cfg->family == IWL_FAM_22000) {           /* gen2 TX_CMD (v7): cmd header 4, len 2, offload 2, flags 4, dram info 8, rate 4, then the 802.11 header */
+      ULONG rate = g_mgmt_rate;
+
+      cmdlen = (USHORT)(24 + hlen + pad);
+      fmemset(s, 0, cmdlen);
+      s[0] = CMD_TX;
+      s[2] = (UCHAR)idx;
+      s[3] = (UCHAR)iwl_txq_qid(qi);
+      put16(s + 4, (USHORT)(hlen + blen));
+      put16(s + 6, (USHORT)(((hlen / 2) << 8) | (pad ? 0x2000 : 0)));
+      fl = protect ? 0UL : 2UL;                    /* ENCRYPT_DIS unless the hardware encrypts (it adds the CCMP header)  */
+      if (mgmt)
+         fl |= 1UL;                                /* CMD_RATE: the rate of this command                      */
+      else {
+         fl |= 1UL;                                /* data: the rung the host's rate control trusts           */
+         rate = rs_rate();
+      }
+      put32(s + 8, fl);
+      put32(s + 20, rate);
+      fmemcpy(s + 24, hdr, hlen);
+      fmemcpy(s + 256, body, blen);
+      return iwl_txq_kick(qi, idx, cmdlen, blen, (USHORT)(hlen + blen), 1);
+   }
    cmdlen = (USHORT)(4 + sizeof(tx_cmd_t) + hlen + pad);
    fmemset(s, 0, cmdlen);
    s[0] = CMD_TX;
@@ -831,9 +872,9 @@ int hw_data_tx(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT
 
 void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
 {
-   USHORT st;
+   USHORT st, stoff = (USHORT)(g_cfg->family == IWL_FAM_22000 ? 40 : 36);   /* TX_RSP v6 has a longer fixed part */
 
-   if (len < sizeof(tx_resp_t))
+   if (len < stoff + 4)
       return;
    if (p[2] == 0)
       rs_resp(p[3]);                               /* failure_rts == 0: data statistics for the rate ladder   */
@@ -841,8 +882,8 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
       txa_tx_resp(qid, p, len);                    /* an A-MPDU: the status field is not a frame's result    */
       return;
    }
-   st = (USHORT)(get16(p + 36) & TX_STATUS_MSK);
-   g_tx_last_st = get16(p + 36);                   /* full status word                                       */
+   st = (USHORT)(get16(p + stoff) & TX_STATUS_MSK);
+   g_tx_last_st = get16(p + stoff);                   /* full status word                                       */
    g_tx_last_fail = p[3];                          /* failure_frame: retries that failed                     */
    g_tx_last_rate = get32(p + 4);                  /* initial_rate                                           */
    g_tx_st_hist[(st == TX_STATUS_SUCCESS) ? 0 : (st == TX_STATUS_DIRECT_DONE) ? 1 : (st < 0x80) ? 2 : 3]++;

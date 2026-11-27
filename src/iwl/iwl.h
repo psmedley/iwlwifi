@@ -902,6 +902,10 @@ int    iwl22_boot(USHORT type);
 void   iwl22_post(USHORT idx, ULONG phys, USHORT len);
 extern USHORT g_q22_fail;
 int    iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid);
+void   iwl22_txq_free(UCHAR sta_id, UCHAR tid);
+void   iwl22_data_tfd(USHORT idx, ULONG ph, USHORT cmdlen, USHORT paylen, USHORT totlen);
+int    iwl22_dataq_create(USHORT sta);
+void   iwl22_dataq_destroy(USHORT sta);
 void   iwl22_free_all(void);
 void   iwl22_free_images(void);
 void   iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));
@@ -924,6 +928,7 @@ void   iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len);   /* 9000 family multi-queue re
 void   iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);
 void   iwl_te_notif(UCHAR FAR *p, USHORT len);
 void   iwl_mac_reset(void);
+ULONG  rs_rate(void);
 extern USHORT g_tx_ok, g_tx_fail, g_rx_mpdu, g_rx_crc, g_rx_decfail;
 extern USHORT g_tx_last_st, g_tx_last_fail, g_tx_st_hist[4];
 extern ULONG  g_tx_last_rate;

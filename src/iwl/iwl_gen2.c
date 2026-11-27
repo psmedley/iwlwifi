@@ -171,37 +171,32 @@ void iwl22_post(USHORT idx, ULONG phys, USHORT len)
  * supplies a ring of TFH descriptors and a byte-count table; the answer is the queue number and its first write pointer. */
 USHORT g_q22_last, g_q22_wptr, g_q22_fail;
 ULONG  g_q22_ring, g_q22_bc;
+static DMA g_dring, g_dbc;                      /* the data queue's descriptor ring (32 TFDs) and byte-count table */
+static USHORT g_dq_ok, g_dq_qid;
 
 int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
 {
    static UCHAR cfg[24];
-   ULONG  ring, bc;
-   UCHAR FAR *z;
-   USHORT i, sel;
    int    rc;
 
-   ring = dma_big_al((ULONG)size * TFH_SIZE, 256);
-   bc = dma_big_al(640UL, 64);
-   if (!ring || !bc) {
-      g_q22_fail = 1;
-      return -1;
+   if (!g_dq_ok) {
+      if (dma_get_al((USHORT)(size * TFH_SIZE), 256, &g_dring) || dma_get_al(640, 64, &g_dbc)) {
+         g_q22_fail = 1;
+         return -1;
+      }
+      g_dq_ok = 1;
    }
-   for (i = 0; i < (USHORT)(((ULONG)size * TFH_SIZE + 4095UL) / 4096UL); i++) {   /* zero the ring (physical memory is not cleared) */
-      sel = scr_map(SCR_D, ring + (ULONG)i * 4096UL, 4096);
-      if (!sel) { g_q22_fail = 2; return -2; }
-      fmemset((UCHAR FAR *)MAKEP(sel, 0), 0, 4096);
-   }
-   sel = scr_map(SCR_D, bc, 640);
-   if (!sel) { g_q22_fail = 2; return -2; }
-   z = (UCHAR FAR *)MAKEP(sel, 0);
-   fmemset(z, 0, 640);
+   fmemset(DPTR(g_dring), 0, (USHORT)(size * TFH_SIZE));     /* physical memory is not cleared */
+   fmemset(DPTR(g_dbc), 0, 640);
+   g_q22_ring = g_dring.phys;
+   g_q22_bc = g_dbc.phys;
    fmemset((UCHAR FAR *)cfg, 0, sizeof(cfg));
    cfg[0] = sta_id;
    cfg[1] = tid;
    put16((UCHAR FAR *)cfg + 2, 1);                          /* flags: TX_QUEUE_CFG_ENABLE_QUEUE                       */
    put32((UCHAR FAR *)cfg + 4, (ULONG)(size == 16 ? 1 : (size == 32 ? 2 : (size == 64 ? 3 : (size == 128 ? 4 : 5)))));   /* log2(size) - 3 */
-   put64((UCHAR FAR *)cfg + 8, bc);                         /* byte_cnt_addr                                          */
-   put64((UCHAR FAR *)cfg + 16, ring);                      /* tfdq_addr                                              */
+   put64((UCHAR FAR *)cfg + 8, g_q22_bc);                   /* byte_cnt_addr                                          */
+   put64((UCHAR FAR *)cfg + 16, g_q22_ring);                /* tfdq_addr                                              */
    rc = iwl_cmd(WIDE_ID(DATA_PATH_GROUP, 0x17), (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
    if (rc || g_resp_len < 8) {
       g_q22_fail = 3;
@@ -209,10 +204,40 @@ int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
    }
    g_q22_last = get16(g_resp);                              /* queue_number                                           */
    g_q22_wptr = get16(g_resp + 4);                          /* write_pointer                                          */
-   g_q22_ring = ring;
-   g_q22_bc = bc;
+   g_dq_qid = g_q22_last;
    *qid = g_q22_last;
    return 0;
+}
+
+/* Remove the data queue again (SCD_QUEUE_CFG with the enable flag clear), when the station goes away. */
+void iwl22_txq_free(UCHAR sta_id, UCHAR tid)
+{
+   static UCHAR cfg[24];
+
+   fmemset((UCHAR FAR *)cfg, 0, sizeof(cfg));
+   cfg[0] = sta_id;
+   cfg[1] = tid;
+   iwl_cmd(WIDE_ID(DATA_PATH_GROUP, 0x17), (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
+}
+
+/* A data frame in the data queue's ring: three transfer buffers (the first 20 bytes of the command, the rest of the command
+ * and the 802.11 header, the payload at ph + 256), and its entry in the byte-count table (frame length in dwords). */
+void iwl22_data_tfd(USHORT idx, ULONG ph, USHORT cmdlen, USHORT paylen, USHORT totlen)
+{
+   UCHAR FAR *t = DPTR(g_dring) + (idx & 31) * TFH_SIZE;
+
+   fmemset(t, 0, TFH_SIZE);
+   put16(t + 2, 20);
+   put64(t + 4, ph);
+   put16(t + 12, (USHORT)(cmdlen - 20));
+   put64(t + 14, ph + 20UL);
+   if (paylen) {
+      put16(t + 22, paylen);
+      put64(t + 24, ph + 256UL);
+      put16(t, 3);
+   } else
+      put16(t, 2);
+   put16(DPTR(g_dbc) + (idx & 31) * 2, (USHORT)((totlen + 3) >> 2));
 }
 
 void iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
