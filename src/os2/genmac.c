@@ -90,7 +90,14 @@ static ULONG rd32(UCHAR FAR *p)
 }
 
 static ULONG g_infra = 1;
-ULONG g_authmode, g_encstat;               /* what the supplicant set (status text: SEC) */
+ULONG g_authmode, g_encstat;
+ULONG g_seclog[12];                         /* history of the supplicant's security SETs: (oid low byte << 24) | value */
+USHORT g_seclog_n;
+static void seclog(ULONG o, ULONG v)
+{
+   g_seclog[g_seclog_n % 12] = (o << 24) | (v & 0xFFFFFFUL);
+   g_seclog_n++;
+}               /* what the supplicant set (status text: SEC) */
 static UCHAR g_wbssid[6];                      /* BSSID the supplicant asked for (OID_802_11_BSSID)             */
 static UCHAR g_wany = 1;                       /* ...or ff:ff:ff:ff:ff:ff = any                                  */
 static UCHAR g_pj;                             /* a (re)join is pending, done by a later request                  */
@@ -353,8 +360,8 @@ static void oid_request(int is_set, ULONG oid, UCHAR FAR *dat, USHORT dlen)
       return;
    }
    if (oid == OID_802_11_INFRASTRUCTURE_MODE) { if (dlen >= 4) g_infra = rd32(dat); return; }
-   if (oid == OID_802_11_AUTHENTICATION_MODE) { if (dlen >= 4) g_authmode = rd32(dat); return; }
-   if (oid == OID_802_11_ENCRYPTION_STATUS)   { if (dlen >= 4) g_encstat = rd32(dat); return; }
+   if (oid == OID_802_11_AUTHENTICATION_MODE) { if (dlen >= 4) { g_authmode = rd32(dat); seclog(0x18UL, g_authmode); } return; }
+   if (oid == OID_802_11_ENCRYPTION_STATUS)   { if (dlen >= 4) { g_encstat = rd32(dat); seclog(0x05UL, g_encstat); } return; }
    if (oid == OID_802_11_BSSID) {                      /* remember the AP the supplicant chose                  */
       if (dlen >= 6) {
          g_wany = 1;
