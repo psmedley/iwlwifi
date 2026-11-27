@@ -332,3 +332,8 @@ error: `HWERR=0001`, `INTCAUSES seen=BDA5A5A3`).
 the newer build (281d3c2) lets the ADDBA through. The `DRIVER=` line now ends in `r2` for builds with that change, and the BA line shows why
 requests are refused (`refusedwhy(nobuf,hw)=`). At 5 GHz the transmit aggregation also `giveup=0001` once (the normal queue never emptied within 2 s) and the
 station layer kept believing it was active; it now asks again after 3 s (`hw_txagg_active`).
+
+**9560, twelfth test (build 8f632df, `r2`): receive aggregation works on the 9000 family.** `BA sessions=0002 refused=0000`, 2.4 GHz HT20 two streams about 5.8 MB/s (8260:
+6.6), 5 GHz HT40 (channel 136) just over 7 MB/s. On channel 136 the link stayed at HT40 although the AP offers 80 MHz (`vht80=1 centre=8A`): the check that
+the primary channel's position in the 80 MHz block agrees with the 40 MHz secondary offset had the pairs the wrong way round for the middle channels
+(channel 136 is the second channel of the pair 132/136: secondary below, sco 3). Fixed (`r3`); channel 149 (first of its pair) had worked.

@@ -1080,7 +1080,9 @@ int sta_join(UCHAR FAR *want_bssid, USHORT any)
    if (g_j40 && g_maxw >= 2 && n->vht && n->vhtw && n->ch > 14 && hw_chan_vht80(n->ch)) {
       int d = (int)n->ch - (int)n->vcf0;
 
-      if ((d == -6 || d == -2) ? g_jsco == 1 : ((d == 2 || d == 6) ? g_jsco == 3 : 0)) {
+      /* the 20 MHz channels of an 80 MHz block are at -6, -2, +2, +6 from its centre; the 40 MHz pairs are (-6, -2) and (+2, +6):
+       * the first of a pair has its secondary above (sco 1), the second below (sco 3) */
+      if ((d == -6 || d == 2) ? g_jsco == 1 : ((d == -2 || d == 6) ? g_jsco == 3 : 0)) {
          g_j80 = 1;
          g_jcf0 = n->vcf0;
       }
