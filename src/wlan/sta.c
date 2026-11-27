@@ -175,6 +175,26 @@ void sta_beacon(UCHAR FAR *f, USHORT len, USHORT chan, short rssi, ULONG rxtime)
    n->seen = dd_ms();
 }
 
+/* Security elements in the stored beacon of net i: bit 0 RSN (48), bit 1 WPA vendor element (221, 00:50:F2 type 1), bit 2 truncated. */
+USHORT sta_net_sec(USHORT i)
+{
+   net_t *n = &g_net[i];
+   USHORT pos, r = 0;
+
+   if (n->ielen >= NET_IE_MAX)
+      r |= 4;
+   for (pos = 12; (USHORT)(pos + 2) <= n->ielen; pos = (USHORT)(pos + 2 + n->ie[pos + 1])) {
+      if ((USHORT)(pos + 2 + n->ie[pos + 1]) > n->ielen)
+         break;
+      if (n->ie[pos] == 48)
+         r |= 1;
+      if (n->ie[pos] == 221 && n->ie[pos + 1] >= 4 && n->ie[pos + 2] == 0x00 && n->ie[pos + 3] == 0x50 &&
+          n->ie[pos + 4] == 0xF2 && n->ie[pos + 5] == 1)
+         r |= 2;
+   }
+   return r;
+}
+
 short sta_rssi(void)
 {
    USHORT k;

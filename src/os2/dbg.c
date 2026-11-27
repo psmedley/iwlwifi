@@ -11,6 +11,7 @@
  */
 #include "drv.h"
 extern ULONG g_authmode, g_encstat;
+USHORT sta_net_sec(USHORT i);
 
 ULONG g_last_err;
 char *g_last_err_txt = "";
@@ -338,7 +339,8 @@ static void build_status(void)
    for (i = 0; i < g_nnet; i++) {
       ps("NET="); ph(g_net[i].ch, 2); ps(" ");
       ph((ULONG)(UCHAR)g_net[i].rssi, 2); ps(g_net[i].htc ? " HT " : " -- ");
-      pfs((char FAR *)g_net[i].ssid, g_net[i].len); nl();
+      pfs((char FAR *)g_net[i].ssid, g_net[i].len);
+      ps(" sec="); ph(sta_net_sec(i), 1); ps(" ielen="); ph(g_net[i].ielen, 3); nl();
    }
 }
 

@@ -7,7 +7,7 @@
 #define WLAN_H
 
 #define NET_MAX         24
-#define NET_IE_MAX      320
+#define NET_IE_MAX      400
 typedef struct net_s {
    UCHAR  bssid[6];
    UCHAR  len;                                  /* SSID length                                               */
