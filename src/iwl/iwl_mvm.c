@@ -516,11 +516,6 @@ static int ax200_runtime(void)
    if (iwl_scan_config())
       return fail("AX200 stage 4: scan configuration failed", 0UL);
    step(0x38);
-   {
-      static beacon_filter_cmd_t bf;               /* iwx_disable_beacon_filter: all zero                         */
-
-      iwl_cmd1(CMD_REPLY_BEACON_FILTERING, (UCHAR FAR *)&bf, sizeof(bf));
-   }
    iwl_mac_reset();
    if (!g_cfgmac) {
       fmemcpy((UCHAR FAR *)g_mymac, (UCHAR FAR *)g_hw_mac, 6);
