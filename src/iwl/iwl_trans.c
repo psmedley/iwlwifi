@@ -1034,7 +1034,7 @@ int iwl22_dataq_create(USHORT sta)
 
 void iwl22_dataq_destroy(USHORT sta)
 {
-   iwl22_txq_free((UCHAR)sta, 15);
+   (void)sta;                                      /* the firmware drops the queue with the station */
    g_txq[QI_BE].qid = 0xFFFF;
 }
 

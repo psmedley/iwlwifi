@@ -638,9 +638,18 @@ void hw_leave(void)
       g_te_on = 0;
    }
    if (g_sta_on) {
+      if (g_cfg->family == IWL_FAM_22000) {        /* iwx: flush the station's transmit path first; the queue goes with the station (no explicit queue removal for this API) */
+         static UCHAR fl[8];
+
+         fmemset((UCHAR FAR *)fl, 0, sizeof(fl));
+         fl[0] = STATION_ID;
+         fl[4] = 0xFF;
+         fl[5] = 0xFF;                             /* all TIDs                                                   */
+         iwl_cmd1(0x1E, (UCHAR FAR *)fl, 8);       /* TXPATH_FLUSH                                               */
+      }
+      rm_sta();
       if (g_cfg->family == IWL_FAM_22000)
          iwl22_dataq_destroy(STATION_ID);
-      rm_sta();
       g_sta_on = 0;
    }
    if (g_bind_on) {
