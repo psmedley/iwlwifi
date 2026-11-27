@@ -238,7 +238,7 @@ int iwl_trans_alloc(void)
       return -1;
    for (i = 0; i < QI_AGG; i++) {
       if (g_cfg->family == IWL_FAM_22000) {          /* gen2: one data queue (the BE one), its ring comes from iwl_gen2.c */
-         g_txq[i].ok = (UCHAR)(i == 2);
+         g_txq[i].ok = 1;
          continue;
       }
       if (dma_get_al(TFD_QUEUE_SIZE_MAX * TFD_SIZE, 256, &g_txq[i].tfd))
@@ -280,7 +280,8 @@ static void reset_rings(void)
    for (i = 0; i < NTXQ; i++) {
       if (!g_txq[i].ok)
          continue;
-      fmemset(DPTR(g_txq[i].tfd), 0, TFD_QUEUE_SIZE_MAX * TFD_SIZE);
+      if (g_cfg->family != IWL_FAM_22000)          /* gen2: the rings are in iwl_gen2.c */
+         fmemset(DPTR(g_txq[i].tfd), 0, TFD_QUEUE_SIZE_MAX * TFD_SIZE);
       g_txq[i].cur = g_txq[i].tail = g_txq[i].queued = 0;
       fmemset((UCHAR FAR *)g_txq[i].busy, 0, TX_SLOTS);
    }
