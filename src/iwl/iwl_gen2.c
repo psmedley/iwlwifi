@@ -197,7 +197,7 @@ int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
    put32((UCHAR FAR *)cfg + 4, (ULONG)(size == 16 ? 1 : (size == 32 ? 2 : (size == 64 ? 3 : (size == 128 ? 4 : 5)))));   /* log2(size) - 3 */
    put64((UCHAR FAR *)cfg + 8, g_q22_bc);                   /* byte_cnt_addr                                          */
    put64((UCHAR FAR *)cfg + 16, g_q22_ring);                /* tfdq_addr                                              */
-   rc = iwl_cmd(WIDE_ID(DATA_PATH_GROUP, 0x17), (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
+   rc = iwl_cmd(0x1D, (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
    if (rc || g_resp_len < 8) {
       g_q22_fail = 3;
       return -3;
@@ -217,7 +217,7 @@ void iwl22_txq_free(UCHAR sta_id, UCHAR tid)
    fmemset((UCHAR FAR *)cfg, 0, sizeof(cfg));
    cfg[0] = sta_id;
    cfg[1] = tid;
-   iwl_cmd(WIDE_ID(DATA_PATH_GROUP, 0x17), (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
+   iwl_cmd(0x1D, (UCHAR FAR *)cfg, 24, (UCHAR FAR *)0, 0, CMDF_WANT_RESP);
 }
 
 /* A data frame in the data queue's ring: three transfer buffers (the first 20 bytes of the command, the rest of the command
