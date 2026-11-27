@@ -1138,6 +1138,8 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
       return -1;
    if (pay > MAX_CMD_PAYLOAD_SIZE)
       return -2;
+   if (g_cfg->family == IWL_FAM_22000 && group == 0)
+      group = 1;                                  /* API >= 50: group 0 commands go out as LONG_GROUP (1)   */
    hl = (USHORT)((group || g_cfg->family == IWL_FAM_22000) ? 8 : 4);   /* gen2: the wide header for every command */
    if (async && pay + hl > CMD_SLOT_SZ)
       return -2;
