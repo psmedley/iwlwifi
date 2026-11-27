@@ -148,6 +148,25 @@ int iwl22_boot(USHORT type)
    return 0;
 }
 
+/* Command queue entry idx: a TFH descriptor of 256 bytes (num_tbs at 0, then up to 25 transfer buffers of 10 bytes: length at +0, 64-bit
+ * address at +2). The first buffer holds the first 20 bytes of the command (the header), the second the rest (Linux
+ * iwl_pcie_gen2_enqueue_hcmd). */
+void iwl22_post(USHORT idx, ULONG phys, USHORT len)
+{
+   UCHAR FAR *t = DPTR(g_cring) + (idx & (CQ_N - 1)) * TFH_SIZE;
+   USHORT l0 = len < 20 ? len : 20;
+
+   fmemset(t, 0, TFH_SIZE);
+   put16(t + 2, l0);
+   put64(t + 4, phys);
+   if (len > l0) {
+      put16(t + 12, (USHORT)(len - l0));
+      put64(t + 14, phys + (ULONG)l0);
+      put16(t, 2);
+   } else
+      put16(t, 1);
+}
+
 void iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
 {
    ps("CTXINFO lmac="); ph(g_ctx_lm, 2); ps(" umac="); ph(g_ctx_um, 2); ps(" paging="); ph(g_ctx_pg, 2);

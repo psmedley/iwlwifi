@@ -898,6 +898,7 @@ ULONG  iwl9_fbd_phys(void);
 ULONG  iwl9_ubd_phys(void);
 int    iwl22_alloc(void);                       /* iwl_gen2.c */
 int    iwl22_boot(USHORT type);
+void   iwl22_post(USHORT idx, ULONG phys, USHORT len);
 void   iwl22_free_all(void);
 void   iwl22_free_images(void);
 void   iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void));

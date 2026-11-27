@@ -268,7 +268,7 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
    (void)idx;
    switch (code) {
    case CMD_ALIVE:
-      if (g_cfg->family == IWL_FAM_22000 && (len == 68 || len == 116)) {   /* mvm_alive_resp v3 / v4: status, flags, lmac (48 bytes, twice with two), umac */
+      if (g_cfg->family == IWL_FAM_22000 && len >= 68) {   /* mvm_alive_resp v3 and later: status, flags, lmac (48 bytes, twice with two), umac, ... */
          g_alive_len = len;
          g_err_table = get32(p + 20);
          g_sched_base = get32(p + 40);
@@ -483,7 +483,30 @@ int hw_up(void)
       if ((rc = iwl_load_ucode(UCODE_REGULAR)) != 0)
          return fail("the AX200 firmware did not start (code: 3 load, 4 no ALIVE, 5 context information)", (ULONG)(USHORT)(-rc));
       step(0x30);
-      return fail("AX200 stage 1 done: the firmware sent ALIVE; the rest (queues, NVM, commands) is not written yet", g_sched_base);
+      {                                              /* stage 2: the first commands through the gen2 command queue: the INIT phase of the unified image */
+         static UCHAR ic[4], nc[4];
+         ULONG t0;
+
+         put32((UCHAR FAR *)ic, 2UL);                /* INIT_EXTENDED_CFG_CMD: init_flags = BIT(IWL_INIT_NVM)   */
+         if (iwl_cmd1(WIDE_ID(SYSTEM_GROUP, 3), (UCHAR FAR *)ic, 4))
+            return fail("AX200 stage 2: INIT_EXTENDED_CFG_CMD failed", 0UL);
+         step(0x31);
+         put32((UCHAR FAR *)nc, 0UL);                /* NVM_ACCESS_COMPLETE (REGULATORY_AND_NVM_GROUP 0x0C)      */
+         if (iwl_cmd1(WIDE_ID(0x0C, 0), (UCHAR FAR *)nc, 4))
+            return fail("AX200 stage 2: NVM_ACCESS_COMPLETE failed", 0UL);
+         step(0x32);
+         g_init_complete = 0;
+         t0 = dd_ms();
+         while (!g_init_complete) {
+            hw_wait(&g_init_complete, 100);
+            if (g_fw_error)
+               return fail("AX200 stage 2: firmware error while waiting for INIT_COMPLETE", g_err_table);
+            if ((long)(dd_ms() - t0) > 3000L)
+               return fail("AX200 stage 2: no INIT_COMPLETE_NOTIF", 0UL);
+         }
+      }
+      step(0x33);
+      return fail("AX200 stage 2 done: ALIVE, two commands through the gen2 command queue and INIT_COMPLETE; queues, NVM and the rest are not written yet", g_sched_base);
    }
    if (run_init_image())
       return -1;

@@ -352,3 +352,12 @@ MSI mode, the context information (14 LMAC, 15 UMAC and 19 paging sections of th
 What to send back: the status text, in particular `STATE=`, `LASTERR=`, `CTXINFO lmac=0E umac=0F paging=13 ... fail=0000`, `ALIVENTF len= first16=`
 (length 68 or 116 and the first bytes of the notification: `FECA` first means status 0xCAFE = OK), `INTCAUSES`, `MQRX`, `PERSIST`, `CSR_INT`, `ERRTBL`, `SCHED`.
 Failure codes in the message: 3 a section did not load, 4 no ALIVE, 5 the context information could not be built (`CTXINFO fail=` says which section).
+
+**AX200, first test (build 8e7260b):** most of it worked at once. `CTXINFO lmac=0E umac=0F paging=13 dram=00149AC4 fail=0000` (all 48 sections copied), the firmware booted
+(`INTCAUSES alive=1 rx=2`, `FWVER=77.3cda2a2c.0`) and the gen2 receive path works: the device wrote three entries into the used ring (`urb_w=0003`, `RXPKT=3`, `used0=00000001`).
+It was reported as "no ALIVE" because the ALIVE notification of firmware 77 is longer than the 68 / 116 bytes known (it carries more data after the
+UMAC part): the length check rejected it (`ALIVE=10`, `ALIVENTF len=0000`). The ALIVE parser now takes any length of 68 or more (the status word and the first
+LMAC / UMAC pointers are at the same offsets) and records the length. An unhandled notification `0xF7` (12 bytes) arrived with it.
+Stage 2 is in the same build (`r3` marker unchanged): the gen2 command queue (TFH descriptor: 256 bytes, header buffer 20 bytes + rest, wide command header
+for every command, write pointer register with the queue id in bits 16+), then `INIT_EXTENDED_CFG_CMD` (SYSTEM group 2, command 3, flags = NVM), `NVM_ACCESS_COMPLETE`
+(group 0x0C, command 0) and the wait for `INIT_COMPLETE_NOTIF`. Success reads `LASTERR=AX200 stage 2 done: ALIVE, two commands through the gen2 command queue and INIT_COMPLETE ...`.

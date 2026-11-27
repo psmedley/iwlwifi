@@ -216,7 +216,7 @@ int iwl_trans_alloc(void)
    USHORT i;
    int    dqa = FW_CAPA(CAPA_DQA_SUPPORT);
 
-   g_cmdq  = (USHORT)(dqa ? DQA_CMD_QUEUE : LEGACY_CMD_QUEUE);
+   g_cmdq  = (USHORT)((dqa || g_cfg->family == IWL_FAM_22000) ? DQA_CMD_QUEUE : LEGACY_CMD_QUEUE);
    g_auxq  = (USHORT)(dqa ? DQA_AUX_QUEUE : LEGACY_AUX_QUEUE);
    g_dataq = (USHORT)(dqa ? DQA_MIN_MGMT_QUEUE : 0);
    g_txq[0].qid = g_cmdq;
@@ -908,8 +908,11 @@ int iwl_load_ucode(USHORT type)
       dd_err(g_alive ? "firmware ALIVE with bad status" : "no ALIVE from the firmware", iwl_rd(CSR_INT));
       return -4;
    }
-   if (g_cfg->family == IWL_FAM_22000)
+   if (g_cfg->family == IWL_FAM_22000) {
       iwl22_free_images();
+      set_mask(CSR_INI_SET_MASK);                 /* iwl_trans_pcie_gen2_fw_alive: all interrupts on       */
+      g_intmask_on = 1;
+   }
    return 0;
 }
 
@@ -1135,7 +1138,7 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
       return -1;
    if (pay > MAX_CMD_PAYLOAD_SIZE)
       return -2;
-   hl = (USHORT)(group ? 8 : 4);
+   hl = (USHORT)((group || g_cfg->family == IWL_FAM_22000) ? 8 : 4);   /* gen2: the wide header for every command */
    if (async && pay + hl > CMD_SLOT_SZ)
       return -2;
    fl = rt_irq_save();
@@ -1160,7 +1163,7 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
       c  = DPTR(g_bigcmd);                        /* synchronous commands: one big buffer is enough         */
       ph = g_bigcmd.phys;
    }
-   if (group) {
+   if (group || g_cfg->family == IWL_FAM_22000) {
       c[0] = (UCHAR)id;                           /* opcode                                                 */
       c[1] = (UCHAR)group;
       c[2] = (UCHAR)idx;
@@ -1178,8 +1181,12 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
    if (l1) fmemcpy(c + hl + l0, d1, l1);
    a[0] = ph;
    n[0] = (USHORT)(hl + pay);
-   tfd_set(q, idx, 1, (ULONG FAR *)a, (USHORT FAR *)n);
-   sched_update(q->qid, idx, 0, 0);
+   if (g_cfg->family == IWL_FAM_22000)
+      iwl22_post(idx, ph, (USHORT)(hl + pay));
+   else {
+      tfd_set(q, idx, 1, (ULONG FAR *)a, (USHORT FAR *)n);
+      sched_update(q->qid, idx, 0, 0);
+   }
    if (!async) {
       g_cmd_done = 0;
       g_cmd_want = (USHORT)(flags & CMDF_WANT_RESP);
@@ -1188,7 +1195,12 @@ static int cmd_queue(USHORT id, UCHAR FAR *d0, USHORT l0, UCHAR FAR *d1, USHORT 
       g_cmd_err = 0;
       g_cmd_wait_idx = idx;
    }
-   kick(q);
+   if (g_cfg->family == IWL_FAM_22000) {          /* gen2: 32 entries; the write pointer and the queue id (bits 16 and up) */
+      q->queued++;
+      q->cur = (USHORT)((q->cur + 1) & (CMD_SLOTS - 1));
+      iwl_wr(HBUS_TARG_WRPTR, (ULONG)q->cur | ((ULONG)q->qid << 16));
+   } else
+      kick(q);
    rt_lock_release(&g_cmdlk);
    rt_irq_restore(fl);
    return 0;
