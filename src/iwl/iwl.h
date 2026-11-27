@@ -814,7 +814,7 @@ void   iwl_dump_fw_error(void);                 /* read the firmware error table
 #define UERRLOG_DW  15
 extern ULONG  g_errlog[ERRLOG_DW], g_uerrlog[UERRLOG_DW];
 extern USHORT g_errlog_ok, g_uerrlog_ok;
-#define CLOG_N      12
+#define CLOG_N 32
 typedef struct { USHORT id; short rc; ULONG info; } clog_t;   /* a host command and how it ended              */
 extern clog_t g_clog[CLOG_N];
 extern USHORT g_clog_n;
