@@ -615,7 +615,7 @@ static ULONG mcs_mask(int max)
 
 static int send_tlc(void)
 {
-   static UCHAR c[28];
+   static UCHAR c[24];                            /* TLC_MNG_CONFIG_CMD_API_S_VER_2 (Linux 5.4): 24 bytes, no max_tx_op */
    USHORT i, nh = 0, mpdu;
 
    fmemset((UCHAR FAR *)c, 0, sizeof(c));
