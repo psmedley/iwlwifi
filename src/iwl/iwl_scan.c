@@ -220,11 +220,19 @@ int hw_scan(void)
       put32(r + 28, SCAN_PRIORITY_HIGH);
    }
 
+   if (g_cfg->family == IWL_FAM_22000) {           /* Linux: IWL_SCAN_PRIORITY_EXT_6 for a regular scan       */
+      put32(r + 8, 6UL);
+      put32(r + 40, 6UL);
+   }
    d = r + base;                                   /* channel configurations                                */
    n = (g_nvm_nchan < g_fw.n_scan_channels) ? g_nvm_nchan : g_fw.n_scan_channels;
    for (i = 0; i < n; i++) {
       d[i * 8 + 4] = g_nvm_chan[i];                /* channel_num                                           */
-      d[i * 8 + 5] = 1;                            /* iter_count                                            */
+      if (ext) {                                   /* channel config v2: channel_num, band (2.4 GHz = 1, 5 GHz = 0), iter_count, iter_interval */
+         d[i * 8 + 5] = (UCHAR)(g_nvm_chan[i] <= 14 ? 1 : 0);
+         d[i * 8 + 6] = 1;
+      } else
+         d[i * 8 + 5] = 1;                         /* v1: iter_count                                        */
    }
    r[chanoff + 1] = (UCHAR)n;                      /* channel.count                                         */
 
