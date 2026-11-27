@@ -321,7 +321,7 @@ void iwl_rx_pkt(USHORT code, UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
       iwl_rx_phy(p, len);
       break;
    case CMD_REPLY_RX_MPDU:
-      if (g_cfg->family == IWL_FAM_9000)
+      if (g_cfg->family >= IWL_FAM_9000)
          iwl_rx_mpdu_mq(p, len);
       else
          iwl_rx_mpdu(p, len);
