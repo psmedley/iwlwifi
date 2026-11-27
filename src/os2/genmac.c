@@ -396,7 +396,7 @@ static void oid_request(int is_set, ULONG oid, UCHAR FAR *dat, USHORT dlen)
       }
       /* an unencrypted network (Open or AutoSwitch with encryption disabled), else WPA2-PSK with CCMP */
       open = (USHORT)((g_authmode == 0UL || g_authmode == 2UL) && g_encstat == 1UL);
-      if (!open && (g_authmode != 7UL || g_encstat != 6UL)) {
+      if (!open && ((g_authmode != 7UL && g_authmode != 4UL) || (g_encstat != 6UL && g_encstat != 4UL))) {   /* WPA-PSK / TKIP is accepted too: the join is always WPA2 / CCMP and the supplicant adapts to the association IEs */
          g_jfail = 6;                                  /* wrong security mode set by the caller                 */
          g_st = NDIS_STATUS_FAILURE;
          return;
