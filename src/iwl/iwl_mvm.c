@@ -746,6 +746,18 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
             nl();
          }
    }
+   if (g_cfg && g_cfg->family >= IWL_FAM_9000) {
+      extern USHORT g_rxlog[32][2], g_rxlog_n, g_txlog[16][2], g_txlog_n;
+      USHORT k, n = g_rxlog_n > 32 ? 32 : g_rxlog_n;
+
+      ps("RXLOG n="); ph(g_rxlog_n, 4); ps(" code/len, oldest first:");
+      for (k = 0; k < n; k++) { USHORT i = (USHORT)((g_rxlog_n > 32 ? g_rxlog_n + k : k) & 31); ps(" "); ph(g_rxlog[i][0], 4); ps("/"); ph(g_rxlog[i][1], 4); }
+      nl();
+      n = g_txlog_n > 16 ? 16 : g_txlog_n;
+      ps("TXLOG n="); ph(g_txlog_n, 4); ps(" idx+fc/len:");
+      for (k = 0; k < n; k++) { USHORT i = (USHORT)((g_txlog_n > 16 ? g_txlog_n + k : k) & 15); ps(" "); ph(g_txlog[i][0], 4); ps("/"); ph(g_txlog[i][1], 4); }
+      nl();
+   }
    if (g_cfg && g_cfg->family == IWL_FAM_22000) {
       USHORT k;
       extern UCHAR g_scan_dump[64];

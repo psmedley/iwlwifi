@@ -800,6 +800,7 @@ int hw_key_clear(USHORT pairwise, UCHAR idx)
 /* hdr: the 802.11 header (24 bytes), body: what follows it. Layout of a slot: cmd header (4), tx command (56),
  * the 802.11 header; the payload (CCMP header + body) at offset 256. */
 
+USHORT g_txlog[16][2], g_txlog_n;
 static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt);
 
 static int tx_frame(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT blen, USHORT protect, USHORT mgmt)
@@ -865,6 +866,9 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
       put32(s + 20, rate);
       fmemcpy(s + 24, hdr, hlen);
       fmemcpy(s + 256, body, blen);
+      g_txlog[g_txlog_n & 15][0] = (USHORT)((idx << 8) | hdr[0]);   /* TXLOG: ring index, frame control, length, kind */
+      g_txlog[g_txlog_n & 15][1] = (USHORT)(hlen + blen);
+      g_txlog_n++;
       return iwl_txq_kick(qi, idx, cmdlen, blen, (USHORT)(hlen + blen), 1);
    }
    cmdlen = (USHORT)(4 + sizeof(tx_cmd_t) + hlen + pad);
