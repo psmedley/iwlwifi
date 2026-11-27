@@ -300,3 +300,9 @@ start: any DMA write by the device shows), `RFHREGS` (the ring addresses read ba
 configured and reads the free ring but the firmware never writes anything into it. Candidates left: Linux calls `iwl_pcie_prepare_card_hw`
 again at the start of `start_fw` (this re-sets the OS_ALIVE mailbox bit that the reset in `start_hw` cleared), which the 8260 path
 does not do; the next build does it for the 9000 family, waits 3 s for the ALIVE, and prints the RFH status/descriptor registers (`RFHST`).
+
+**9560, seventh test (build d31ac88):** with the OS_ALIVE mailbox bit now set (`MBOX=00000020`) the firmware is still silent. The RFH shows it holds
+our first two buffers (`rbd0=00B50001 rbd1=00B51002`, write pointer `orb=00B50000`) and has written nothing. Found in the Linux table:
+every `A370` entry is a `*_cfg_soc` configuration (`integrated = true`), for which `iwl_pcie_rx_mq_hw_init` sets the receive DMA chunk size to
+64 bytes (`RFH_GEN_CFG` bit 4 clear), not 128. The driver used 128 (`gen=00000013`); an SoC-attached device may not accept 128-byte write
+bursts. The device table now carries an `integrated` flag; the next build writes `RFH_GEN_CFG = 3` for these parts.

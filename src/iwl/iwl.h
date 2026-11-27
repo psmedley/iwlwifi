@@ -30,6 +30,7 @@ typedef struct {
    UCHAR  supported;                            /* this build drives the family (see ADDING-A-DEVICE.md)  */
    USHORT nvm_max_section;                      /* bytes                                                  */
    char  *fw;                                   /* firmware file (linux-firmware name)                    */
+   UCHAR  integrated;                           /* CNVi / SoC-attached part: 64-byte receive DMA chunks (RFH_GEN_CFG)  */
 } iwl_cfg_t;
 
 typedef struct {

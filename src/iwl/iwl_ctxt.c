@@ -84,8 +84,8 @@ void iwl9_rx_init(void)
    /* DMA enable | 4 KB buffers (4 << 16) | minimum buffer size 4/8 (3 << 24) | drop frames that exceed the buffer |
     * 512 descriptors (9 << 20) */
    iwl_prph_wr(RFH_RXF_DMA_CFG, 0x80000000UL | 0x00040000UL | 0x03000000UL | 0x04000000UL | 0x00900000UL);
-   /* DMA snooping (bits 0, 1), default queue 0, 128-byte chunks (bit 4) */
-   iwl_prph_wr(RFH_GEN_CFG, 0x00000003UL | 0x00000010UL);
+   /* DMA snooping (bits 0, 1), default queue 0; receive DMA chunks of 64 bytes for an integrated (CNVi / SoC) part, 128 otherwise (bit 4) */
+   iwl_prph_wr(RFH_GEN_CFG, 0x00000003UL | (g_cfg->integrated ? 0x00000000UL : 0x00000010UL));
    iwl_prph_wr(RFH_RXF_RXQ_ACTIVE, 0x00010001UL);          /* queue 0 (bits 0 and 16)                               */
    mmio_wr8(CSR_INT_COALESCING, HOST_INT_TIMEOUT_DEF);
    iwl_wr(RFH_Q_FRBDCB_WIDX_TRG, (ULONG)(g_mq_wr & ~7));

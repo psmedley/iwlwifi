@@ -52,8 +52,8 @@ static const iwl_cfg_t cfg_7260 = { IWL_FAM_7000, IWL_NVM,     1, 0, 16384U, "iw
 static const iwl_cfg_t cfg_3160 = { IWL_FAM_7000, IWL_NVM,     1, 0, 16384U, "iwlwifi-3160-17.ucode" };
 static const iwl_cfg_t cfg_7265 = { IWL_FAM_7000, IWL_NVM,     0, 1, 16384U, "iwlwifi-7265D-29.ucode" };
 static const iwl_cfg_t cfg_3168 = { IWL_FAM_7000, IWL_NVM_SDP, 0, 0, 16384U, "iwlwifi-3168-29.ucode" };
-static const iwl_cfg_t cfg_9560 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode" };   /* CNVi, "Jefferson Peak" radio */
-static const iwl_cfg_t cfg_9560_x = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode" };
+static const iwl_cfg_t cfg_9560 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 1, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };   /* CNVi, "Jefferson Peak" radio */
+static const iwl_cfg_t cfg_9560_x = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9000-pu-b0-jf-b0-46.ucode", 1 };
 static const iwl_cfg_t cfg_9260 = { IWL_FAM_9000, IWL_NVM_EXT, 0, 0, 32768U, "iwlwifi-9260-th-b0-jf-b0-46.ucode" };
 
 static const iwl_dev_t g_devs[] = {
