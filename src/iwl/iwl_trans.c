@@ -479,6 +479,7 @@ static void service_once(void)
       if (r1 & CSR_INT_BIT_SW_ERR) {
          g_fw_error++;
          dd_err("firmware error (SW_ERR), error table at", g_err_table);
+         iwl_dump_fw_error();                       /* keep the error tables for the status text (also for a crash between commands) */
       }
       if (r1 & CSR_INT_BIT_HW_ERR) {
          g_hw_err++;
