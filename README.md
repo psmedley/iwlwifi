@@ -1,7 +1,6 @@
 # iwlwifi for OS/2 and ArcaOS
 
-A native driver for **Intel Wireless-AC 8260** PCIe WiFi adapters (`8086:24F3`, the "Wireless 8260" that lspci
-reports) for OS/2 and ArcaOS, structured so that the other members of Linux's **iwlwifi** family can be added. It
+A native driver for **Intel Wireless-AC 8260 and 9560** WiFi adapters (and, experimentally, the 7265) for OS/2 and ArcaOS, structured so that the other members of Linux's **iwlwifi** family can be added. It
 has the same shape as the [QCA6174 driver](https://github.com/psmedley/qca6174) and the OS2World RTL drivers:
 
 * a **GenMAC-compatible device** (`\DEV\WRND32$`, DosDevIOCtl category 99h OID GET/SET), so the ArcaOS
@@ -12,15 +11,17 @@ The chip side is a port of OpenBSD's **iwm(4)** (ISC licence), cross-checked lin
 **iwlwifi** (`pcie/`, `mvm/`, `fw/api/`). It is a 16-bit physical device driver built with Open Watcom 2.0 and
 NASM; no IBM DDK is needed.
 
-> **Status: first hardware results.** On an 8260 (`8086:24F3`, subsystem `8086:0010`, rev 3A) the driver loads and
-> registers with NDIS, the firmware file is accepted, and bring-up gets through both firmware images (INIT and
-> runtime, with paging), the NVM (MAC address, 26 channels, 2.4/5 GHz, 11n/11ac, LAR), calibration (15 PHY DB
-> sections), DQA, the auxiliary station and the PHY context, with working interrupts. It then stopped on a firmware
-> error at the power/temperature commands (fixed in the next run); see [docs/TESTING.md](docs/TESTING.md), "Hardware
-> results". Run 2 reached `READY` and scanned 2.4 and 5 GHz (16 access points). **Run 3: it joins a WPA2-PSK
-> network, gets an address and passes traffic, about 3.3 MB/s downloading** (2.4 GHz channel 11, one stream, 20 MHz,
-> no aggregation). A COM1 cable helps but is not required: the driver state can be read from
-> `\DEV\WRND32$`.
+> **Status.** Tested on hardware, with WPA2-PSK, DHCP and file transfers:
+>
+> | Adapter | PCI id | Firmware (`bin/firmware/`) | State | Best result so far |
+> |---|---|---|---|---|
+> | Intel Wireless-AC 8260 | `8086:24F3` | `iwlwifi-8000C-36.ucode` | working | 10.5-11 MB/s down, 10.7 MB/s up (5 GHz HT40) |
+> | Intel Wireless-AC 9560 (CNVi) | `8086:A370`, subsystem `4030` | `iwlwifi-9000-pu-b0-jf-b0-46.ucode` | working, experimental | **15.4 MB/s down, 14.4 MB/s up** (5 GHz, 80 MHz VHT) |
+> | Intel Wireless 7265 / 3165 | `8086:095A`, `095B`, `3165`, `3166` | `iwlwifi-7265D-29.ucode` (D step), `iwlwifi-7265-17.ucode` | written, not yet tried on hardware | - |
+>
+> The AX200 / AX201 / AX210 / AX211 families need a different transport (see [docs/NEXT.md](docs/NEXT.md)); they are not
+> supported yet. The per-run history is in [docs/TESTING.md](docs/TESTING.md). A COM1 cable helps but is not required:
+> the driver state can be read from `\DEV\WRND32$`.
 
 ## What it does
 
@@ -38,15 +39,15 @@ NASM; no IBM DDK is needed.
 | WPA2-PSK: EAPOL queue to the supplicant, CCMP keys in the firmware (pairwise and group), CCMP header on transmit | `wlan/sta.c`, `iwl/iwl_mac.c` | written |
 | Data: Ethernet <-> 802.11 (LLC/SNAP), TX commands on the BE queue, RX MPDUs decrypted by the firmware | `wlan/sta.c`, `iwl/iwl_mac.c` | written |
 
-Not done (see [docs/NEXT.md](docs/NEXT.md)): 80 MHz (VHT) is written but unconfirmed on hardware, as is the transmit aggregation fix list (receive aggregation is in:
-the AP's block-ack requests are accepted), host-side rate adaptation (the firmware only walks the rate table on retries), power save,
-WPA3/TKIP/WEP, roaming. Other iwlwifi devices are listed in the device table but not driven yet: see
-[docs/ADDING-A-DEVICE.md](docs/ADDING-A-DEVICE.md).
+Also in: HT40 and 80 MHz (VHT) channels, receive and transmit aggregation (A-MPDU), host rate adaptation, optional power
+save (`POWERSAVE = 1`). Not done (see [docs/NEXT.md](docs/NEXT.md)): WPA3 / TKIP / WEP, roaming, 802.11ax, the
+22000 family and newer, the firmware's own receive reordering on the 9000 family. All options (`MAXWIDTH`, `STREAMS`,
+`AMPDU`, `AGGTX`, `RATEADAPT`, `POWERSAVE`, `CHANNEL`, `NETADDRESS`) are described in `install\PROTOCOL.INI.example`.
 
 ## Install (for testing)
 
 1. Copy `bin\IWLWIFI.OS2` and `install\IWLWIFI.NIF` to `C:\IBMCOM\MACS`.
-2. Copy `bin\firmware\iwlwifi-8000C-36.ucode` (from linux-firmware `intel/iwlwifi/`) to `C:\IBMCOM\MACS\IWLWIFI\`.
+2. Copy the firmware file for your adapter (table above; from linux-firmware `intel/iwlwifi/`) to `C:\IBMCOM\MACS\IWLWIFI\`.
 3. `CONFIG.SYS`: `DEVICE=C:\IBMCOM\MACS\IWLWIFI.OS2 /V` (only one `WRND32$` driver can be loaded: remove GenMAC,
    an RTL driver or the QCA6174 driver line).
 4. `PROTOCOL.INI`: bind `IWLWIFI_NIF` as in `install\PROTOCOL.INI.example`.

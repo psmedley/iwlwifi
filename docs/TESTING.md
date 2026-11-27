@@ -337,3 +337,7 @@ station layer kept believing it was active; it now asks again after 3 s (`hw_txa
 6.6), 5 GHz HT40 (channel 136) just over 7 MB/s. On channel 136 the link stayed at HT40 although the AP offers 80 MHz (`vht80=1 centre=8A`): the check that
 the primary channel's position in the 80 MHz block agrees with the 40 MHz secondary offset had the pairs the wrong way round for the middle channels
 (channel 136 is the second channel of the pair 132/136: secondary below, sco 3). Fixed (`r3`); channel 149 (first of its pair) had worked.
+
+**9560, thirteenth test (build 34c33ca, `r3`): 80 MHz works.** `LINK=JOINED 88 ... VHT80 NSS=2` on 5 GHz channel 136 (`rate=4400F019`: VHT, 80 MHz, two streams, MCS 9, short GI):
+download **15.4 MB/s**, upload over SMB **14.4 MB/s** (about the wired OS/2 machine's 15 MB/s, and well above the 8260's 10.5 MB/s at HT40).
+Receive aggregation `sessions=0002`, transmit aggregation ACTIVE, no firmware errors, `HWERR=0000`.
