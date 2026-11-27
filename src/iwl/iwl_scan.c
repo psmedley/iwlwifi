@@ -36,6 +36,12 @@ int iwl_scan_config(void)
    if (buf())
       return -1;
    c = DPTR(g_sbuf);
+   if (g_cfg->family == IWL_FAM_22000 && FW_API(56)) {   /* API_REDUCED_SCAN_CONFIG: enable_cam, promisc, bcast_sta_id (0xFF), reserved, tx_chains, rx_chains */
+      c[2] = 0xFF;
+      put32(c + 4, (ULONG)iwl_valid_tx_ant());
+      put32(c + 8, (ULONG)iwl_valid_rx_ant());
+      return iwl_cmd1(WIDE_ID(LONG_GROUP, CMD_SCAN_CFG), c, 12);
+   }
    n = (g_nvm_nchan < g_fw.n_scan_channels) ? g_nvm_nchan : g_fw.n_scan_channels;
    put32(c + 4, (ULONG)iwl_valid_tx_ant());        /* tx_chains                                             */
    put32(c + 8, (ULONG)iwl_valid_rx_ant());        /* rx_chains                                             */
