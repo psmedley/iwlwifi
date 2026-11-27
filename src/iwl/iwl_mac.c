@@ -659,8 +659,6 @@ static int ba_cmd(UCHAR tid, USHORT ssn, USHORT win, USHORT start)
 
 int hw_ba_start(UCHAR tid, USHORT ssn, USHORT win)
 {
-   if (g_cfg->family == IWL_FAM_9000)              /* multi-queue receive: the firmware reorders (BAID); not done yet, the AP then sends single MPDUs */
-      return -1;
    return ba_cmd(tid, ssn, win, 1);
 }
 

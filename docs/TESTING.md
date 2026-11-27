@@ -320,3 +320,9 @@ MIC (the 8 bytes after the data of a CCMP frame) itself: Linux sets `RX_FLAG_MIC
 (bit 26). The station layer always cut 8 bytes as the MIC, so every protected frame lost its last 8 bytes of data (a DHCP offer or an ARP reply
 with a truncated payload is dropped by the stack: long waits). Now `RXF_MIC_STRIPPED` carries that flag and the cut is skipped when the hardware
 already did it. The 8260 path is unchanged.
+
+**9560, tenth test (build c88e0a8): DHCP is quick now.** 2.4 GHz channel 1, HT20, two streams (`rate=0000E10F`), download only 2.3 MB/s: receive block-ack sessions
+were refused on this family (`refused=0002`), so the AP sent single MPDUs (the 8260 gave 3.3 MB/s in the same situation). Two changes: the host reorder
+buffer and the ADD_STA block-ack session are enabled for the 9000 family too (the firmware's BAID hints are not used yet; frames are reordered by their
+sequence numbers as on the 8260), and `CSR_INT` reads of `0xA5A5A5Ax` (the MAC asleep) are ignored in the service loop (they were counted as a hardware
+error: `HWERR=0001`, `INTCAUSES seen=BDA5A5A3`).

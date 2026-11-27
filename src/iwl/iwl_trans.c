@@ -457,8 +457,8 @@ static void service_once(void)
 
    r1 = iwl_rd(CSR_INT);
    r2 = iwl_rd(CSR_FH_INT_STATUS);
-   if (r1 == 0xFFFFFFFFUL)
-      return;                                     /* device gone (or powered down)                        */
+   if (r1 == 0xFFFFFFFFUL || (r1 & 0xFFFFFFF0UL) == 0xA5A5A5A0UL)
+      return;                                     /* device gone, powered down or asleep (the 9000 family answers 0xA5A5A5Ax while its MAC sleeps; the interrupt stays pending) */
    if (r1 | r2) {
       iwl_wr(CSR_INT, r1);
       iwl_wr(CSR_FH_INT_STATUS, r2);
