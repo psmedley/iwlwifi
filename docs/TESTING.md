@@ -326,3 +326,9 @@ were refused on this family (`refused=0002`), so the AP sent single MPDUs (the 8
 buffer and the ADD_STA block-ack session are enabled for the 9000 family too (the firmware's BAID hints are not used yet; frames are reordered by their
 sequence numbers as on the 8260), and `CSR_INT` reads of `0xA5A5A5Ax` (the MAC asleep) are ignored in the service loop (they were counted as a hardware
 error: `HWERR=0001`, `INTCAUSES seen=BDA5A5A3`).
+
+**9560, eleventh test (two statuses, 2.4 GHz and 5 GHz): about 2.3 MB/s and 1.8 MB/s.** Both still show `BA ... sessions=0000 refused=0002` and
+`ASYNC ok<=1`: no block-ack ADD_STA was ever sent, which is the behaviour of the previous build (it refused receive aggregation on this family);
+the newer build (281d3c2) lets the ADDBA through. The `DRIVER=` line now ends in `r2` for builds with that change, and the BA line shows why
+requests are refused (`refusedwhy(nobuf,hw)=`). At 5 GHz the transmit aggregation also `giveup=0001` once (the normal queue never emptied within 2 s) and the
+station layer kept believing it was active; it now asks again after 3 s (`hw_txagg_active`).

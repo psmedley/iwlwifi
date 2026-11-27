@@ -52,6 +52,7 @@ int    hw_mgmt_tx(UCHAR FAR *frame, USHORT len);   /* a complete management fram
 int    hw_ba_start(UCHAR tid, USHORT ssn, USHORT win);
 int    hw_ba_stop(UCHAR tid);
 /* Transmit aggregation: the station sends the ADDBA request itself and tells the back end what the AP answered. */
+int    hw_txagg_active(void);                   /* 1 = the back end is offering, configuring or running the aggregation of TID 0 */
 int    hw_txagg_ok(void);                       /* 1 = this firmware can aggregate transmit frames (DQA queues) */
 USHORT hw_qos_sn(void);                         /* the next QoS sequence number of TID 0 (start of the BA window) */
 void   hw_txagg_offer(UCHAR tid, USHORT win);   /* the AP accepted the ADDBA request: move TID 0 to an aggregation queue */

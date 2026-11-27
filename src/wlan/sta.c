@@ -278,6 +278,7 @@ static ba_t   g_ba[BA_N];
 static DMA    g_ba_buf[BA_N];
 static UCHAR  g_ba_buf_ok[BA_N];
 UCHAR  g_ampdu = 1;
+USHORT g_ba_why_nobuf, g_ba_why_hw;                     /* why ADDBA requests were refused: no session or buffer / the back end said no */
 USHORT g_ba_started, g_ba_refused, g_ba_stopped, g_ba_rel, g_ba_old, g_ba_dup, g_ba_to, g_ba_max, g_ba_direct;
 
 static void rx_eth(UCHAR FAR *eth, USHORT len);
@@ -469,6 +470,7 @@ static void ba_addba_request(UCHAR FAR *f, USHORT len)
    }
    if (bi < 0) {                                        /* no (more) sessions: refuse, the AP sends single MPDUs */
       g_ba_refused++;
+      g_ba_why_nobuf++;
       tx_addba_resp(f, 37, params);                     /* status 37: request declined                         */
       return;
    }
@@ -480,6 +482,7 @@ static void ba_addba_request(UCHAR FAR *f, USHORT len)
    b = &g_ba[bi];
    if (hw_ba_start(tid, ssn, win)) {
       g_ba_refused++;
+      g_ba_why_hw++;
       tx_addba_resp(f, 37, params);
       return;
    }
@@ -556,6 +559,10 @@ static void atx_tick(void)
    ULONG now;
 
    if (!g_joined || !g_jht || !g_aggtx) {
+      return;
+   }
+   if (g_atx == ATX_ON && !hw_txagg_active()) {            /* the back end gave up (the normal queue never emptied) or failed: ask again later */
+      atx_backoff(3000UL);
       return;
    }
    if (g_atx == ATX_WAIT) {

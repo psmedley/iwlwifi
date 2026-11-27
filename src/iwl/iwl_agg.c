@@ -180,6 +180,11 @@ static void leave(USHORT fl)
    rt_irq_restore(fl);
 }
 
+int hw_txagg_active(void)
+{
+   return g_txa_state == TXA_OFFER || g_txa_state == TXA_CFG || g_txa_state == TXA_ACTIVE;
+}
+
 int hw_txagg_ok(void)
 {
    return iwl_txq_present(QI_AGG) && g_hw_ready && FW_CAPA(CAPA_DQA_SUPPORT) && g_txa_state != TXA_FAILED;
