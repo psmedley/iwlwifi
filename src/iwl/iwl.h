@@ -905,6 +905,7 @@ extern USHORT g_hwtxlk;                         /* the data queues: transmit (an
 extern UCHAR  g_ampdu_par;                      /* the AP's HT capabilities A-MPDU parameters (association response) */
 void   iwl_rx_mpdu(UCHAR FAR *p, USHORT len);
 void   iwl_rx_phy(UCHAR FAR *p, USHORT len);
+void   iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len);   /* 9000 family multi-queue receive descriptor */
 void   iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len);
 void   iwl_te_notif(UCHAR FAR *p, USHORT len);
 void   iwl_mac_reset(void);

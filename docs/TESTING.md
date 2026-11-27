@@ -306,3 +306,10 @@ our first two buffers (`rbd0=00B50001 rbd1=00B51002`, write pointer `orb=00B5000
 every `A370` entry is a `*_cfg_soc` configuration (`integrated = true`), for which `iwl_pcie_rx_mq_hw_init` sets the receive DMA chunk size to
 64 bytes (`RFH_GEN_CFG` bit 4 clear), not 128. The driver used 128 (`gen=00000013`); an SoC-attached device may not accept 128-byte write
 bursts. The device table now carries an `integrated` flag; the next build writes `RFH_GEN_CFG = 3` for these parts.
+
+**9560, eighth test (build 6ca5567): `STATE=0064 READY`.** The 64-byte receive DMA chunk for integrated parts was the missing piece. The card booted both images,
+the driver read the NVM (`MAC=F4:D1:08:C6:99:59`, NVM version 1135, 26 channels, 5 GHz, 11n, 11ac), the runtime image started and 13 scans ran
+(`SCAN n=000D done=1`). No networks were found (`NETS=0000`) because the receive packet format is different in multi-queue mode: `MPDU=00C0 CRC=00BD`
+means the legacy parser misread the status of 189 of 192 frames. Next build parses the multi-queue descriptor (`iwl_rx_mpdu_mq`: 48-byte
+descriptor before the frame, status word at offset 12, padding after the header, energy and channel in the descriptor); receive block-ack
+sessions are refused on this family for now (the firmware reorders in multi-queue mode).

@@ -659,6 +659,8 @@ static int ba_cmd(UCHAR tid, USHORT ssn, USHORT win, USHORT start)
 
 int hw_ba_start(UCHAR tid, USHORT ssn, USHORT win)
 {
+   if (g_cfg->family == IWL_FAM_9000)              /* multi-queue receive: the firmware reorders (BAID); not done yet, the AP then sends single MPDUs */
+      return -1;
    return ba_cmd(tid, ssn, win, 1);
 }
 
@@ -867,6 +869,73 @@ void iwl_rx_phy(UCHAR FAR *p, USHORT len)
       return;
    fmemcpy((UCHAR FAR *)&g_phy, p, sizeof(g_phy));
    g_phy_ok = 1;
+}
+
+/* The 802.11 header length of a received frame (for the device's two padding bytes after the header, which it inserts when
+ * the header is not a multiple of four bytes long). */
+static USHORT rx_hdrlen(UCHAR FAR *f)
+{
+   USHORT n;
+
+   if (((f[0] >> 2) & 3) == 1)                    /* control: not expected with padding                      */
+      return 10;
+   n = 24;
+   if (((f[0] >> 2) & 3) == 2) {                  /* data                                                   */
+      if ((f[1] & 3) == 3)
+         n += 6;                                  /* four addresses                                         */
+      if (f[0] & 0x80)
+         n += 2;                                  /* QoS                                                    */
+   }
+   if ((f[1] & 0x80) && (((f[0] >> 2) & 3) != 2 || (f[0] & 0x80)))
+      n += 4;                                     /* HT control                                             */
+   return n;
+}
+
+/* Multi-queue receive (9000 family): REPLY_RX_MPDU carries struct iwl_rx_mpdu_desc (48 bytes) before the frame:
+ * mpdu_len @0, mac_flags2 @3 (0x20: two pad bytes after the header, 0x40: A-MSDU), status @12 (1 CRC ok, 2 overrun ok,
+ * 0x40 MIC ok, 0x700 security type, 0x800 decrypted), rate @28, energy A/B @32/33, channel @34, gp2 @36. */
+void iwl_rx_mpdu_mq(UCHAR FAR *p, USHORT len)
+{
+   USHORT bc, st, fl = 0, hl, i;
+   int    a, b, r;
+   UCHAR FAR *f;
+
+   if (len < 48 + 24)
+      return;
+   bc = get16(p);
+   st = get16(p + 12);
+   if (bc < 24 || (ULONG)48 + (ULONG)bc > (ULONG)len)
+      return;
+   g_rx_mpdu++;
+   if (!(st & 0x0001) || !(st & 0x0002)) {
+      g_rx_crc++;
+      return;
+   }
+   f = p + 48;
+   if (p[3] & 0x20) {                              /* remove the padding that follows the header (and the CCMP header) */
+      hl = rx_hdrlen(f);
+      if ((st & 0x0700) == 0x0200)
+         hl += 8;
+      if ((USHORT)(hl + 2) > bc)
+         return;
+      for (i = hl; i > 0; i--)
+         f[i + 1] = f[i - 1];
+      f += 2;
+      bc -= 2;
+   }
+   if ((f[1] & 0x40) && (st & 0x0700) == 0x0200) {
+      if (!(st & 0x0040) || !(st & 0x0800)) {       /* MIC not verified / not decrypted                         */
+         g_rx_decfail++;
+         return;
+      }
+      fl |= RXF_DECRYPTED;
+   }
+   a = p[32];
+   b = p[33];
+   a = a ? -a : -256;
+   b = b ? -b : -256;
+   r = a > b ? a : b;
+   sta_rx_frame(f, bc, p[34], (short)r, fl, get32(p + 36));
 }
 
 /* REPLY_RX_MPDU: { USHORT byte_count; USHORT reserved; frame[byte_count]; ULONG status } */
