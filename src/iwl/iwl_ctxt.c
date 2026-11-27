@@ -25,6 +25,7 @@
 #define RFH_RXF_DMA_CFG         0xA09820UL
 #define RFH_Q_FRBDCB_WIDX_TRG   0x1C80          /* a CSR (not periphery) register                          */
 
+extern USHORT g_mq_nbuf;
 static DMA    g_fbd, g_ubd;
 static USHORT g_mq_rd, g_mq_wr, g_mq_wra;       /* used ring read index; free ring write index (and what the device was told) */
 USHORT g_mq_bad, g_mq_bufs;
@@ -64,13 +65,13 @@ void iwl22_rx_init(void)
    iwl9_reset();
    fmemset(iwl_rbstat_ptr(), 0, 16);
    d = DPTR(g_fbd);
-   for (i = 0; i < RX_NBUF; i++) {
+   for (i = 0; i < g_mq_nbuf; i++) {
       put32(d + i * 8, iwl_rxbuf_phys(i) | (ULONG)(i + 1));
       put32(d + i * 8 + 4, 0UL);
    }
-   g_mq_wr = RX_NBUF;
+   g_mq_wr = g_mq_nbuf;
    g_mq_wra = 0;
-   g_mq_bufs = RX_NBUF;
+   g_mq_bufs = g_mq_nbuf;
    mmio_wr8(CSR_INT_COALESCING, HOST_INT_TIMEOUT_DEF);
 }
 
@@ -80,7 +81,7 @@ void iwl22_alive_restock(void)
    iwl_wr(RFH_Q_FRBDCB_WIDX_TRG, (ULONG)g_mq_wra);
 }
 
-/* iwl_pcie_rx_mq_hw_init + the first restock: RX_NBUF buffers of 4 KB, buffer id = index + 1 */
+/* iwl_pcie_rx_mq_hw_init + the first restock: g_mq_nbuf buffers of 4 KB, buffer id = index + 1 */
 void iwl9_rx_init(void)
 {
    UCHAR FAR *d;
@@ -89,7 +90,7 @@ void iwl9_rx_init(void)
    iwl9_reset();
    fmemset(iwl_rbstat_ptr(), 0, 16);
    d = DPTR(g_fbd);
-   for (i = 0; i < RX_NBUF; i++) {
+   for (i = 0; i < g_mq_nbuf; i++) {
       put32(d + i * 8, iwl_rxbuf_phys(i) | (ULONG)(i + 1));
       put32(d + i * 8 + 4, 0UL);
    }
@@ -99,9 +100,9 @@ void iwl9_rx_init(void)
       if (sel)
          fmemset((UCHAR FAR *)MAKEP(sel, 0), 0, 4096);
    }
-   g_mq_wr = RX_NBUF;
-   g_mq_wra = RX_NBUF;
-   g_mq_bufs = RX_NBUF;
+   g_mq_wr = g_mq_nbuf;
+   g_mq_wra = g_mq_nbuf;
+   g_mq_bufs = g_mq_nbuf;
    iwl_prph_wr(RFH_RXF_DMA_CFG, 0UL);                      /* stop receive DMA                                      */
    iwl_prph_wr(RFH_RXF_RXQ_ACTIVE, 0UL);
    prph64(RFH_Q_FRBDCB_BA_LSB, g_fbd.phys);
@@ -134,7 +135,7 @@ void iwl9_rx_service(void)
       u = DPTR(g_ubd);
       vid = (USHORT)(get32(u + g_mq_rd * 4) & 0x0FFFUL);
       g_mq_rd = (USHORT)((g_mq_rd + 1) & (MQ_N - 1));
-      if (vid == 0 || vid > RX_NBUF) {
+      if (vid == 0 || vid > g_mq_nbuf) {
          g_mq_bad++;                                        /* never expected: that buffer stays lost                */
          g_mq_bufs--;
          continue;

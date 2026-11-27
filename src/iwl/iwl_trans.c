@@ -184,7 +184,8 @@ typedef struct {
 
 static txq_t  g_txq[NTXQ];
 static DMA    g_kw, g_sched, g_rbd, g_rbstat, g_bigcmd, g_respbuf, g_fwdma;
-static ULONG  g_rxblk[RX_NBUF / 16];            /* 4 blocks of 64 KB, 16 buffers each                     */
+USHORT g_mq_nbuf = RX_NBUF;                     /* receive buffers posted on the multi-queue families (what the memory allowed) */
+static ULONG  g_rxblk[MQ_NBUF / 16];            /* blocks of 64 KB, 16 buffers each (4 used on the older families, 16 on the multi-queue ones) */
 static USHORT g_rxcur;
 static USHORT g_alloc_done;
 UCHAR FAR    *g_resp;
@@ -193,7 +194,7 @@ USHORT        g_resp_len, g_resp_failed;
 ULONG iwl_rxbuf_phys(USHORT i);
 static ULONG rxbuf_phys(USHORT i)
 {
-   i &= (RX_NBUF - 1);
+   i &= (USHORT)((g_cfg->family >= IWL_FAM_9000 ? g_mq_nbuf : RX_NBUF) - 1);
    return g_rxblk[i >> 4] + (ULONG)((i & 15) << 12);
 }
 
@@ -262,9 +263,18 @@ int iwl_trans_alloc(void)
          g_txq[QI_AGG].ok = 1;
       }
    }
-   for (i = 0; i < RX_NBUF / 16; i++)
-      if ((g_rxblk[i] = dma_big_al(0x10000UL, 4096)) == 0UL)
+   {
+      USHORT want = (USHORT)((g_cfg->family >= IWL_FAM_9000 ? MQ_NBUF : RX_NBUF) / 16), got;
+
+      for (got = 0; got < want; got++)
+         if ((g_rxblk[got] = dma_big_al(0x10000UL, 4096)) == 0UL)
+            break;
+      if (got < 4)
          return -5;
+      while (got & (got - 1))                       /* a power of two (4, 8, 16 blocks): 64, 128 or 256 buffers */
+         got--;
+      g_mq_nbuf = (USHORT)(got * 16);
+   }
    if ((g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000) && iwl9_alloc())
       return -6;
    if (g_cfg->family == IWL_FAM_22000 && iwl22_alloc())

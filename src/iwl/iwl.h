@@ -250,6 +250,7 @@ extern char *g_devname;
 #define QI_AGG                  6               /* ... and the aggregation queue of TID 0                  */
 #define RX_RING_COUNT           256             /* hardware ring of receive buffer descriptors            */
 #define RX_NBUF                 64              /* buffers actually posted                                */
+#define MQ_NBUF                 256             /* the same on the multi-queue receive families (9000, 22000): more room for a slow service loop */
 #define RBUF_SIZE               4096
 
 /* =================================================================================================== */
