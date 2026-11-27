@@ -187,6 +187,11 @@ static int mac_ctxt(ULONG action, USHORT assoc)
    return iwl_cmd1(CMD_MAC_CONTEXT, (UCHAR FAR *)&c, sizeof(c));
 }
 
+int iwl_mac_probe_add(void)
+{
+   return mac_ctxt(FW_CTXT_ACTION_ADD, 0);
+}
+
 static int binding(ULONG action)
 {
    static binding_cmd_t c;

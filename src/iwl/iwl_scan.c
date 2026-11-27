@@ -175,8 +175,13 @@ static int hw_scan_lmac(void)
    return 0;
 }
 
+UCHAR g_scan_dump[64];                          /* the first bytes of the last UMAC scan request, for the status text */
+extern USHORT g_scan_variant;
+int iwl_mac_probe_add(void);
+
 int hw_scan(void)
 {
+   USHORT var = (USHORT)(g_cfg->family == IWL_FAM_22000 ? g_scan_variant : 0);
    UCHAR FAR *r, FAR *d, FAR *tail;
    USHORT base, tlen, n, i, ext = (USHORT)FW_API(API_SCAN_EXT_CHAN_VER), chanoff;
    USHORT gf;
@@ -226,6 +231,8 @@ int hw_scan(void)
    }
    d = r + base;                                   /* channel configurations                                */
    n = (g_nvm_nchan < g_fw.n_scan_channels) ? g_nvm_nchan : g_fw.n_scan_channels;
+   if (var == 2)
+      n = 1;
    for (i = 0; i < n; i++) {
       d[i * 8 + 4] = g_nvm_chan[i];                /* channel_num                                           */
       if (ext) {                                   /* channel config v2: channel_num, band (2.4 GHz = 1, 5 GHz = 0), iter_count, iter_interval */
@@ -237,6 +244,8 @@ int hw_scan(void)
    r[chanoff + 1] = (UCHAR)n;                      /* channel.count                                         */
 
    gf = UMAC_SCAN_GEN_FLAGS_PASS_ALL | UMAC_SCAN_GEN_FLAGS_ITER_COMPLETE;
+   if (var >= 3)
+      gf = UMAC_SCAN_GEN_FLAGS_PASSIVE | UMAC_SCAN_GEN_FLAGS_ITER_COMPLETE;
    if (FW_CAPA(CAPA_DS_PARAM_SET_IE_SUPPORT) && FW_CAPA(CAPA_WFA_TPC_REP_IE_SUPPORT))
       gf |= UMAC_SCAN_GEN_FLAGS_RRM_ENABLED;
    gf |= FW_API(API_ADAPTIVE_DWELL) ? UMAC_SCAN_GEN_FLAGS_ADAPTIVE_DWELL : UMAC_SCAN_GEN_FLAGS_EXTENDED_DWELL;
@@ -246,6 +255,9 @@ int hw_scan(void)
    tail[2] = 1;                                    /* schedule[0]: interval 0, one iteration                 */
    fill_preq(tail + 12, (USHORT)(ext ? 3 : 2));
 
+   if (var == 1 || var == 2 || var == 4)
+      iwl_mac_probe_add();                         /* a MAC context before the scan, as Linux has */
+   fmemcpy((UCHAR FAR *)g_scan_dump, r, 64);
    g_scan_done = 0;
    sta_age();
    if (iwl_cmd1(WIDE_ID(LONG_GROUP, CMD_SCAN_REQ_UMAC), r, (USHORT)(base + 8 * g_fw.n_scan_channels + tlen)))

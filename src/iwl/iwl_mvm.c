@@ -484,6 +484,68 @@ static int ax200_unified(USHORT read_nvm)
    return 0;
 }
 
+/* AX200: the runtime set-up after the second firmware start (Linux iwl_mvm_up), also repeated after a firmware crash. */
+static int ax200_runtime(void)
+{
+   step(0x39);
+   /* stage 4: the runtime set-up of iwl_mvm_up for a unified image (in the second firmware start) */
+   iwl_send_sf(SF_INIT_OFF, 0);                    /* Smart FIFO (Linux ignores a failure)                       */
+   if (send_tx_ant())
+      return fail("AX200 stage 4: TX_ANT_CONFIGURATION failed", 0UL);
+   if (send_bt_init())
+      tstr("[iwl: BT coexistence command refused]");
+   step(0x35);
+   if (0 && add_aux_sta())                         /* iwx scans without an auxiliary station; its queue command crashes fw 50 */
+      return fail("AX200 stage 4: the auxiliary station or its queue could not be created", (ULONG)g_q22_fail);
+   step(0x36);
+   if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
+      return fail("AX200 stage 4: PHY context add failed", 0UL);
+   if (iwl_send_power())
+      return fail("AX200 stage 4: POWER_TABLE failed", 0UL);
+   step(0x37);
+   if (FW_CAPA(CAPA_LAR_SUPPORT) && send_mcc())
+      tstr("[iwl: MCC update refused]");
+   if (iwl_scan_config())
+      return fail("AX200 stage 4: scan configuration failed", 0UL);
+   step(0x38);
+   iwl_mac_reset();
+   if (!g_cfgmac) {
+      fmemcpy((UCHAR FAR *)g_mymac, (UCHAR FAR *)g_hw_mac, 6);
+      ndis_set_mac(g_mymac);
+   }
+   g_hw_nss = (UCHAR)(((iwl_valid_rx_ant() & 3) == 3) ? 2 : 1);
+   step(0x64);
+   g_hw_ready = 1;                                /* scanning works; there are no data queues yet: no join */
+   tstr("[iwl: AX200 ready for scanning, firmware "); tstr(g_fw.version); tstr("]"); tnl();
+   return 0;
+}
+
+UCHAR g_try[8];                                 /* AX200 scan variants tried: 1 ok, 2 firmware crash, 3 other failure */
+USHORT g_scan_variant;
+
+/* The AX200 scan request crashed the firmware in field tests; until the right format is known the driver tries a
+ * few variants at start-up, restarting the firmware after each crash, and records the outcome (SCANTRY). */
+static void ax200_autotest(void)
+{
+   USHORT v;
+   int rc;
+
+   for (v = 0; v < 5; v++) {
+      g_scan_variant = v;
+      rc = hw_scan();
+      g_try[v] = (UCHAR)(rc == 0 ? 1 : (g_fw_error ? 2 : 3));
+      if (rc == 0)
+         return;
+      if (!g_fw_error)
+         continue;
+      g_hw_ready = 0;
+      iwl_stop_device();
+      if (iwl_start_hw() || ax200_unified(0) || ax200_runtime())
+         return;
+   }
+   g_scan_variant = 0;
+}
+
 int hw_up(void)
 {
    USHORT ac;
@@ -528,36 +590,9 @@ int hw_up(void)
          return fail("AX200: the adapter could not be restarted after the NVM read", iwl_rd(CSR_GP_CNTRL));
       if (ax200_unified(0))
          return -1;
-      step(0x39);
-      /* stage 4: the runtime set-up of iwl_mvm_up for a unified image (in the second firmware start) */
-      iwl_send_sf(SF_INIT_OFF, 0);                    /* Smart FIFO (Linux ignores a failure)                       */
-      if (send_tx_ant())
-         return fail("AX200 stage 4: TX_ANT_CONFIGURATION failed", 0UL);
-      if (send_bt_init())
-         tstr("[iwl: BT coexistence command refused]");
-      step(0x35);
-      if (0 && add_aux_sta())                         /* iwx scans without an auxiliary station; its queue command crashes fw 50 */
-         return fail("AX200 stage 4: the auxiliary station or its queue could not be created", (ULONG)g_q22_fail);
-      step(0x36);
-      if (iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_ADD, g_nvm_nchan ? g_nvm_chan[0] : 1, 1, 1, 0, 0))
-         return fail("AX200 stage 4: PHY context add failed", 0UL);
-      if (iwl_send_power())
-         return fail("AX200 stage 4: POWER_TABLE failed", 0UL);
-      step(0x37);
-      if (FW_CAPA(CAPA_LAR_SUPPORT) && send_mcc())
-         tstr("[iwl: MCC update refused]");
-      if (iwl_scan_config())
-         return fail("AX200 stage 4: scan configuration failed", 0UL);
-      step(0x38);
-      iwl_mac_reset();
-      if (!g_cfgmac) {
-         fmemcpy((UCHAR FAR *)g_mymac, (UCHAR FAR *)g_hw_mac, 6);
-         ndis_set_mac(g_mymac);
-      }
-      g_hw_nss = (UCHAR)(((iwl_valid_rx_ant() & 3) == 3) ? 2 : 1);
-      step(0x64);
-      g_hw_ready = 1;                                /* scanning works; there are no data queues yet: no join */
-      tstr("[iwl: AX200 ready for scanning, firmware "); tstr(g_fw.version); tstr("]"); tnl();
+      if (ax200_runtime())
+         return -1;
+      ax200_autotest();
       return 0;
    }
    if (run_init_image())
@@ -691,6 +726,22 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
       ps("FWLOG hcmd="); ph(g_errlog[23], 8); ps(" isr="); ph(g_errlog[24], 8); ps(","); ph(g_errlog[25], 8);
       ps(","); ph(g_errlog[26], 8); ps(","); ph(g_errlog[27], 8); ps(","); ph(g_errlog[28], 8);
       ps(" lastcmdid="); ph(g_errlog[29], 8); ps(" waitevent="); ph(g_errlog[30], 8); nl();
+   }
+   if (g_cfg && g_cfg->family == IWL_FAM_22000) {
+      USHORT k;
+      extern UCHAR g_scan_dump[64];
+
+      ps("SCANTRY var="); ph(g_scan_variant, 2); ps(" results(1 ok 2 crash 3 fail)=");
+      for (k = 0; k < 5; k++) ph(g_try[k], 2);
+      nl();
+      ps("SCANCMD ");
+      for (k = 0; k < 64; k++) ph(g_scan_dump[k], 2);
+      nl();
+      if (g_uerrlog_ok) {
+         ps("UMACRAW");
+         for (k = 0; k < UERRLOG_DW; k++) { ps(" "); ph(g_uerrlog[k], 8); }
+         nl();
+      }
    }
    if (g_uerrlog_ok) {
       ps("UMACLOG valid="); ph(g_uerrlog[0], 8); ps(" id="); ph(g_uerrlog[1], 8); ps(" data="); ph(g_uerrlog[6], 8);
