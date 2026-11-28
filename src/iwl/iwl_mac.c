@@ -967,7 +967,7 @@ void iwl22_ba_notif(UCHAR FAR *p, USHORT len)
       return;
    tc = get16(p + 28);
    rc = get16(p + 30);
-   o = (USHORT)(32 + rc * 2);
+   o = (USHORT)(32 + rc * 4);                      /* ra_tid entries: q_num, tid, ssn (4 bytes each), then the tfd entries (8 bytes each) */
    if ((ULONG)o + (ULONG)tc * 8UL > (ULONG)len)
       return;
    for (i = 0; i < tc; i++) {
