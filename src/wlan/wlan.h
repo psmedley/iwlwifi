@@ -70,6 +70,7 @@ int    sta_eapol_tx(UCHAR FAR *eth, USHORT len);
 USHORT sta_eapol_count(void);
 USHORT sta_eapol_get(UCHAR FAR *dst, USHORT max);
 extern UCHAR  g_powersave;                        /* PROTOCOL.INI POWERSAVE = 1 enables 802.11 power save (default 0) */
+extern USHORT g_cfg_mqbufs;                      /* PROTOCOL.INI MQBUFS */
 extern UCHAR  g_ax_tlc;                          /* PROTOCOL.INI AX200TLC = 0: no firmware rate scaling on the AX200 */
 extern UCHAR  g_rateadapt;                       /* PROTOCOL.INI RATEADAPT = 0 turns host rate adaptation off  */
 extern UCHAR  g_aggtx;                          /* PROTOCOL.INI AGGTX = 0 turns transmit aggregation off       */

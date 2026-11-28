@@ -959,7 +959,7 @@ UCHAR g_ba_dump[48], g_txr_dump[48];
 
 void iwl22_ba_notif(UCHAR FAR *p, USHORT len)
 {
-   USHORT tc, rc, i, o;
+   USHORT tc, rc, o;
 
    g_ba22_n++;
    fmemcpy((UCHAR FAR *)g_ba_dump, p, len < 48 ? len : 48);
@@ -970,19 +970,8 @@ void iwl22_ba_notif(UCHAR FAR *p, USHORT len)
    o = (USHORT)(32 + rc * 4);                      /* ra_tid entries: q_num, tid, ssn (4 bytes each), then the tfd entries (8 bytes each) */
    if ((ULONG)o + (ULONG)tc * 8UL > (ULONG)len)
       return;
-   for (i = 0; i < tc; i++) {
-      UCHAR FAR *t = p + o + i * 8;
-
-      if (get16(t) == iwl_txq_qid(QI_BE)) {
-         USHORT fl = rt_irq_save();
-
-         if (!rt_lock_acquire(&g_hwtxlk, (USHORT)(rt_cpu_id() + 1))) {
-            iwl_txq_reclaim_to(QI_BE, (USHORT)(get16(t + 2) & 31));
-            rt_lock_release(&g_hwtxlk);
-         }
-         rt_irq_restore(fl);
-      }
-   }
+   /* the tfd_index of these notifications is not trusted yet (it freed slots the firmware still used): slots are released by the TX responses and, as a safety net, by age */
+   (void)tc; (void)o;
 }
 
 void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)

@@ -563,6 +563,11 @@ static void pi_line(char *l)
          g_rateadapt = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "mqbufs")) {        /* MQBUFS = 64 | 128 | 256: receive buffers on the 9560 / AX200 (default 64) */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_cfg_mqbufs = (USHORT)(*v == '2' ? 256 : (*v == '1' ? 128 : 64));
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "ax200tlc")) {      /* AX200TLC = 0 | 1: the firmware's rate scaling (default 1) or rates from the host in every frame */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_ax_tlc = (UCHAR)(*v == '0' ? 0 : 1);

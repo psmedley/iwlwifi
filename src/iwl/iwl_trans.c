@@ -179,11 +179,13 @@ typedef struct {
    DMA    buf;                                  /* slots (command queue, the BE data queue)              */
    USHORT nslot, slotsz;
    UCHAR  busy[TX_SLOTS];                       /* data queue: slot awaits its TX response               */
+   USHORT stamp[TX_SLOTS];                      /* gen2: when the frame was queued (ms, low 16 bits), for the safety release of a leaked slot */
    UCHAR  ok;                                   /* the ring exists (the aggregation queue is optional)    */
 } txq_t;
 
 static txq_t  g_txq[NTXQ];
 static DMA    g_kw, g_sched, g_rbd, g_rbstat, g_bigcmd, g_respbuf, g_fwdma;
+USHORT g_cfg_mqbufs = 64;                       /* PROTOCOL.INI MQBUFS = 64 | 128 | 256                                           */
 USHORT g_mq_nbuf = RX_NBUF;                     /* receive buffers posted on the multi-queue families (what the memory allowed) */
 static ULONG  g_rxblk[MQ_NBUF / 16];            /* blocks of 64 KB, 16 buffers each (4 used on the older families, 16 on the multi-queue ones) */
 static USHORT g_rxcur;
@@ -264,7 +266,7 @@ int iwl_trans_alloc(void)
       }
    }
    {
-      USHORT want = (USHORT)((g_cfg->family >= IWL_FAM_9000 ? MQ_NBUF : RX_NBUF) / 16), got;
+      USHORT want = (USHORT)((g_cfg->family >= IWL_FAM_9000 ? g_cfg_mqbufs : RX_NBUF) / 16), got;
 
       for (got = 0; got < want; got++)
          if ((g_rxblk[got] = dma_big_al(0x10000UL, 4096)) == 0UL)
@@ -1314,6 +1316,15 @@ UCHAR FAR *iwl_txq_slot(USHORT qi, USHORT *idx, ULONG *phys)
    txq_t *q = &g_txq[qi];
    USHORT s;
 
+   if (g_cfg->family == IWL_FAM_22000 && q->queued >= 24) {   /* a slot whose release never came (aggregated frames): free it after a quarter of a second */
+      USHORT now = (USHORT)dd_ms();
+
+      while (q->queued && q->busy[q->tail & (TX_SLOTS - 1)] && (USHORT)(now - q->stamp[q->tail & (TX_SLOTS - 1)]) > 250) {
+         q->busy[q->tail & (TX_SLOTS - 1)] = 0;
+         q->queued--;
+         q->tail = (USHORT)((q->tail + 1) & 31);
+      }
+   }
    if (!g_trans_on || !q->ok || !q->nslot || q->qid == 0xFFFF || q->queued >= TX_SLOTS - 1)
       return 0;
    s = (USHORT)(q->cur & (TX_SLOTS - 1));
@@ -1338,6 +1349,7 @@ int iwl_txq_kick(USHORT qi, USHORT idx, USHORT cmdlen, USHORT paylen, USHORT tot
    if (g_cfg->family == IWL_FAM_22000) {          /* gen2: TFH ring of 32, doorbell with the queue id in bits 16 and up */
       iwl22_data_tfd(idx, ph, cmdlen, paylen, totlen);
       q->busy[s] = 1;
+      q->stamp[s] = (USHORT)dd_ms();
       q->queued++;
       q->cur = (USHORT)((q->cur + 1) & 31);
       iwl_wr(HBUS_TARG_WRPTR, (ULONG)q->cur | ((ULONG)q->qid << 16));
