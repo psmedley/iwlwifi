@@ -758,7 +758,7 @@ static int ba_cmd(UCHAR tid, USHORT ssn, USHORT win, USHORT start)
 
 int hw_ba_start(UCHAR tid, USHORT ssn, USHORT win)
 {
-   if (g_cfg->family == IWL_FAM_22000)             /* AX200: no receive block-ack sessions until the firmware's own command is ported (a station modify may crash it) */
+   if (g_cfg->family == IWL_FAM_22000 && !g_ax_ba)   /* AX200: receive block-ack sessions only with PROTOCOL.INI AX200BA = 1 (untested on this family) */
       return -1;
    return ba_cmd(tid, ssn, win, 1);
 }

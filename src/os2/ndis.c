@@ -563,6 +563,11 @@ static void pi_line(char *l)
          g_rateadapt = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
+      if (eqn(k, (USHORT)(e - k), "ax200ba")) {       /* AX200BA = 0 | 1: receive block-ack sessions on the AX200 (default 0) */
+         for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
+         g_ax_ba = (UCHAR)(*v == '1' ? 1 : 0);
+         return;
+      }
       if (eqn(k, (USHORT)(e - k), "ax200qos")) {      /* AX200QOS = 0 | 1: send QoS data frames (1, default) or plain data frames (0) */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_ax_qos = (UCHAR)(*v == '0' ? 0 : 1);

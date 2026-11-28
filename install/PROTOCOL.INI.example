@@ -40,3 +40,8 @@
    ; Optional: 802.11 power save, 0 or 1 (default 0: always awake, fastest). 1 lets the adapter sleep between
    ; frames (stays awake 100 ms after each frame); saves power on a laptop, adds a little latency.
    ; POWERSAVE = 1
+
+   ; AX200 only (all default to the values that work): the firmware's own rate scaling (AX200TLC = 1) or rates from the host
+   ; (0); QoS data frames (AX200QOS = 1) or plain data frames (0); receive block-ack sessions (AX200BA = 0 off, 1 on: faster
+   ; downloads, still being tested); receive buffers on the 9560 / AX200 (MQBUFS = 64, 128 or 256).
+   ; AX200BA = 1

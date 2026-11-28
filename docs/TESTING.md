@@ -407,3 +407,5 @@ Summary of what the AX200 needed beyond the 8000/9000 code (all found by reading
 group-0 commands as LONG_GROUP; reduced SCAN_CFG; scan request v9; multi-queue RX descriptors; SCD_QUEUE_CFG as legacy command 0x1D for TID 0 (TID 15 maps to a small FIFO);
 gen2 TX_CMD v7 with hardware CCMP; TLC_MNG_CONFIG v2 (24 bytes); SOC_CONFIGURATION_CMD (discrete); TX slots released by the TX response's ring index; a 32-entry data ring (128 crashes at the first wrap);
 the link is ended by restarting the firmware (the removal commands crash it). Still missing: RX block-ack sessions (declined), TX aggregation, power save, PMF.
+
+AX200 next test: `AX200BA = 1` (RX block-ack sessions) on a 5 GHz VHT80 link; compare with the 3.16 MB/s of the 2.4 GHz HT20 run.
