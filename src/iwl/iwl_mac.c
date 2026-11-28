@@ -649,10 +649,14 @@ static int send_tlc(void)
    return iwl_cmd_async(WIDE_ID(DATA_PATH_GROUP, 0x0F), (UCHAR FAR *)c, sizeof(c));
 }
 
+extern ULONG g_join_ms, g_crash_after;
+
 int hw_join_complete(void)
 {
    UCHAR ch = (UCHAR)(two_streams() ? 2 : 1);
 
+   g_join_ms = dd_ms() | 1UL;                      /* never 0 */
+   g_crash_after = 0xFFFFFFFFUL;
    scan_rates((UCHAR FAR *)g_jres, g_jreslen, (UCHAR)(g_jch > 14));
    g_jnss = (UCHAR)(two_streams() ? 2 : 1);
    if (g_jht && iwl_send_phy_ctxt((USHORT)FW_CTXT_ACTION_MODIFY, g_jch, ch, ch, join_width(), join_ctrl()))

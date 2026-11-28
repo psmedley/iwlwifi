@@ -560,9 +560,15 @@ static void ax200_autotest(void)
 
 /* AX200: end a link by restarting the firmware (the removal commands - station, binding, MAC, PHY context - made the firmware
  * assert in field tests, with an error that has no documentation). Takes a few seconds; everything is rebuilt from scratch. */
+USHORT g_ax_restarts;                            /* firmware restarts since the driver loaded (status text AX200 line)  */
+ULONG  g_join_ms, g_crash_after = 0xFFFFFFFFUL;   /* time of the last join completion; ms from it to the first SW_ERR after it */
+
 int hw_ax200_reset(void)
 {
    ULONG t0 = dd_ms();
+
+   g_ax_restarts++;
+   g_crash_after = 0xFFFFFFFFUL;
 
    while ((long)(dd_ms() - t0) < 40L)               /* let a deauthentication frame leave first                     */
       ;
@@ -784,8 +790,10 @@ void hw_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), voi
       extern UCHAR g_scan_dump[64], g_ba_dump[48], g_txr_dump[48];
       extern USHORT g_ba22_n;
       extern UCHAR g_ax_tlc;
+      extern USHORT g_ax_restarts;
+      extern ULONG g_crash_after;
 
-      ps("AX200 tlc="); ph(g_ax_tlc, 1); ps(" banotifs="); ph(g_ba22_n, 4); nl();
+      ps("AX200 tlc="); ph(g_ax_tlc, 1); ps(" banotifs="); ph(g_ba22_n, 4); ps(" restarts="); ph(g_ax_restarts, 4); ps(" crash_after_join_ms="); ph(g_crash_after, 8); nl();
       ps("LASTBA "); for (k = 0; k < 48; k++) ph(g_ba_dump[k], 2); nl();
       ps("LASTTXR "); for (k = 0; k < 48; k++) ph(g_txr_dump[k], 2); nl();
 

@@ -163,6 +163,7 @@ static USHORT g_trans_on;                       /* registers mapped, device powe
 static USHORT g_irq_masked;
 static USHORT g_auxq, g_dataq;
 void   iwl_cmd_answer(USHORT code, UCHAR idx, UCHAR flags, UCHAR FAR *p, USHORT len);                  /* DQA: aux 1, data 5..8; legacy: aux 15, data 0..3       */
+extern ULONG g_join_ms, g_crash_after;
 USHORT g_hw_err, g_svc_runs, g_rx_pkts, g_rx_bad, g_last_code, g_cmd_to;
 USHORT g_rxlog[32][2], g_rxlog_n;               /* the last 32 received packets: code, length (status text RXLOG) */
 ULONG  g_rx_lnf;                                /* len_n_flags of the packet being handled                  */
@@ -496,6 +497,8 @@ static void service_once(void)
       if (!(r1 & (CSR_INT_BIT_ALIVE | CSR_INT_BIT_FH_RX | CSR_INT_BIT_FH_TX))) g_int_other++;
       if (r1 & CSR_INT_BIT_SW_ERR) {
          g_fw_error++;
+         if (g_crash_after == 0xFFFFFFFFUL && g_join_ms)
+            g_crash_after = dd_ms() - g_join_ms;
          dd_err("firmware error (SW_ERR), error table at", g_err_table);
          iwl_dump_fw_error();                       /* keep the error tables for the status text (also for a crash between commands) */
       }
