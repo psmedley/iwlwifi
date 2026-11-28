@@ -42,6 +42,8 @@
    ; POWERSAVE = 1
 
    ; AX200 only (all default to the values that work): the firmware's own rate scaling (AX200TLC = 1) or rates from the host
-   ; (0); QoS data frames (AX200QOS = 1) or plain data frames (0); receive block-ack sessions (AX200BA = 0 off, 1 on: faster
-   ; downloads, still being tested); receive buffers on the 9560 / AX200 (MQBUFS = 64, 128 or 256, default 256).
-   ; AX200BA = 1
+   ; (0); QoS data frames (AX200QOS = 1) or plain data frames (0); receive block-ack sessions (AX200BA = 1 on, the default: faster
+   ; and more stable downloads; 0 off); receive buffers on the 9560 / AX200 (MQBUFS = 64 to 480, default 256: the AX200
+   ; firmware stops if it runs out of buffers during a burst, so more is safer).
+   ; AX200BA = 0
+   ; MQBUFS = 480

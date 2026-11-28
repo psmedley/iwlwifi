@@ -196,7 +196,11 @@ USHORT        g_resp_len, g_resp_failed;
 ULONG iwl_rxbuf_phys(USHORT i);
 static ULONG rxbuf_phys(USHORT i)
 {
-   i &= (USHORT)((g_cfg->family >= IWL_FAM_9000 ? g_mq_nbuf : RX_NBUF) - 1);
+   if (g_cfg->family >= IWL_FAM_9000) {
+      if (i >= g_mq_nbuf)
+         i = 0;
+   } else
+      i &= (USHORT)(RX_NBUF - 1);
    return g_rxblk[i >> 4] + (ULONG)((i & 15) << 12);
 }
 
@@ -273,9 +277,7 @@ int iwl_trans_alloc(void)
             break;
       if (got < 4)
          return -5;
-      while (got & (got - 1))                       /* a power of two (4, 8, 16 blocks): 64, 128 or 256 buffers */
-         got--;
-      g_mq_nbuf = (USHORT)(got * 16);
+      g_mq_nbuf = (USHORT)(got * 16);               /* what the memory allowed (the older families use RX_NBUF) */
    }
    if ((g_cfg->family == IWL_FAM_9000 || g_cfg->family == IWL_FAM_22000) && iwl9_alloc())
       return -6;

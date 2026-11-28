@@ -527,7 +527,7 @@ static void ba_addba_request(UCHAR FAR *f, USHORT len)
 #define ATX_ON     2
 UCHAR  g_aggtx = 1;
 UCHAR  g_powersave;                                      /* PROTOCOL.INI POWERSAVE = 1                           */
-UCHAR  g_ax_ba = 0;
+UCHAR  g_ax_ba = 1;
 UCHAR  g_ax_qos = 1;
 UCHAR  g_ax_tlc = 1;                                   /* PROTOCOL.INI AX200TLC                                */
 UCHAR  g_rateadapt = 1;                                 /* PROTOCOL.INI RATEADAPT                               */

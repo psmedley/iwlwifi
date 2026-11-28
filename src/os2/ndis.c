@@ -563,7 +563,7 @@ static void pi_line(char *l)
          g_rateadapt = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
-      if (eqn(k, (USHORT)(e - k), "ax200ba")) {       /* AX200BA = 0 | 1: receive block-ack sessions on the AX200 (default 0) */
+      if (eqn(k, (USHORT)(e - k), "ax200ba")) {       /* AX200BA = 0 | 1: receive block-ack sessions on the AX200 (default 1) */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
          g_ax_ba = (UCHAR)(*v == '1' ? 1 : 0);
          return;
@@ -573,9 +573,17 @@ static void pi_line(char *l)
          g_ax_qos = (UCHAR)(*v == '0' ? 0 : 1);
          return;
       }
-      if (eqn(k, (USHORT)(e - k), "mqbufs")) {        /* MQBUFS = 64 | 128 | 256: receive buffers on the 9560 / AX200 (default 64) */
+      if (eqn(k, (USHORT)(e - k), "mqbufs")) {        /* MQBUFS = 64 .. 480: receive buffers on the 9560 / AX200 (default 256) */
          for (v = p + 1; *v && (*v < '0' || *v > '9'); v++) ;
-         g_cfg_mqbufs = (USHORT)(*v == '2' ? 256 : (*v == '1' ? 128 : 64));
+         {
+            USHORT q = 0;
+
+            while (*v >= '0' && *v <= '9')
+               q = (USHORT)(q * 10 + (*v++ - '0'));
+            if (q < 64) q = 64;
+            if (q > 480) q = 480;
+            g_cfg_mqbufs = (USHORT)(q & ~15);
+         }
          return;
       }
       if (eqn(k, (USHORT)(e - k), "ax200tlc")) {      /* AX200TLC = 0 | 1: the firmware's rate scaling (default 1) or rates from the host in every frame */

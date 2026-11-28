@@ -415,3 +415,6 @@ The late 0x5D crash gets earlier the higher the throughput: suspect the RX FIFO 
 
 **AX200 on a DFS channel (136, VHT80, centre 138): the firmware dies within seconds** (LMAC 0xEDC after 5 ping replies with `MQBUFS=64`, after 27/60 acknowledged frames in two download attempts, with and without `AX200BA`).
 Channels 11 and 149 (not DFS) ran for hundreds of MB. Not understood; Linux joins DFS channels. Suspect something regulatory (MCC / channel flags) or the PHY context for radar channels. Avoid channels 100-144 with the AX200 for now.
+
+**AX200, channel 149 VHT80, 256 buffers:** with `AX200BA = 1`: 10/10 pings, a download completed at 9.52 MB/s; the next one stopped at 97% (6.2 MB/s, UMAC 0x5D); without block-ack the download crashes within seconds (0x5D, TXOK ~36).
+Block-ack on is now the default. `MQBUFS` goes up to 480 (the 512-entry ring minus a margin): the firmware's RX FIFO watchdog fires when the host is slow to return buffers (interrupt latency of 80 ms is normal on OS/2).
