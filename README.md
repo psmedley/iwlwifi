@@ -17,9 +17,10 @@ NASM; no IBM DDK is needed.
 > |---|---|---|---|---|
 > | Intel Wireless-AC 8260 | `8086:24F3` | `iwlwifi-8000C-36.ucode` | working | 10.5-11 MB/s down, 10.7 MB/s up (5 GHz HT40) |
 > | Intel Wireless-AC 9560 (CNVi) | `8086:A370`, subsystem `4030` | `iwlwifi-9000-pu-b0-jf-b0-46.ucode` | working, experimental | **15.4 MB/s down, 14.4 MB/s up** (5 GHz, 80 MHz VHT) |
+> | Intel Wi-Fi 6 AX200 / Killer AX1650 | `8086:2723` | `iwlwifi-cc-a0-50.ucode` | working, experimental (scan, join, WPA2, data; one 285 MB download completed) | 3.2 MB/s down (2.4 GHz HT20, firmware rate scaling); no aggregation yet |
 > | Intel Wireless 7265 / 3165 | `8086:095A`, `095B`, `3165`, `3166` | `iwlwifi-7265D-29.ucode` (D step), `iwlwifi-7265-17.ucode` | written, not yet tried on hardware | - |
 >
-> The AX200 / AX201 / AX210 / AX211 families need a different transport (see [docs/NEXT.md](docs/NEXT.md)); they are not
+> The AX201 / AX210 / AX211 families need a further transport generation (see [docs/NEXT.md](docs/NEXT.md)); they are not
 > supported yet. The per-run history is in [docs/TESTING.md](docs/TESTING.md). A COM1 cable helps but is not required:
 > the driver state can be read from `\DEV\WRND32$`.
 

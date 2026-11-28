@@ -401,3 +401,9 @@ TX response status at byte 40, `ADD_STA` without a queue mask, `BINDING_CONTEXT_
 **AX200, ring size lesson:** a 128-entry data ring made the firmware assert at the first wrap (entry 127 -> 0): the `TXLOG` of five consecutive crashes ended `7E 7F 00 01`.
 The 32-entry ring wraps every 32 frames without trouble, so it stays. (`TXLOG`, `RXLOG`, `LASTBA`, `LASTTXR` and `SCANTRY` exist for such investigations.)
 PROTOCOL.INI options for the AX200: `AX200TLC` (firmware rate scaling, default 1), `AX200QOS` (QoS data frames, default 1), `MQBUFS` (receive buffers 64 | 128 | 256, default 64).
+
+**AX200, first complete transfer (build 20e5e0c): a 285 MB download over HTTP finished at 3.16 MB/s, `FWERR=0000` afterwards** (link: 2.4 GHz channel 11, HT20, 2 streams, WPA2-PSK, DHCP, ping, samba all fine).
+Summary of what the AX200 needed beyond the 8000/9000 code (all found by reading OpenBSD `iwx` and Linux 5.4/5.10):
+group-0 commands as LONG_GROUP; reduced SCAN_CFG; scan request v9; multi-queue RX descriptors; SCD_QUEUE_CFG as legacy command 0x1D for TID 0 (TID 15 maps to a small FIFO);
+gen2 TX_CMD v7 with hardware CCMP; TLC_MNG_CONFIG v2 (24 bytes); SOC_CONFIGURATION_CMD (discrete); TX slots released by the TX response's ring index; a 32-entry data ring (128 crashes at the first wrap);
+the link is ended by restarting the firmware (the removal commands crash it). Still missing: RX block-ack sessions (declined), TX aggregation, power save, PMF.
