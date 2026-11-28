@@ -412,3 +412,6 @@ AX200 next test: `AX200BA = 1` (RX block-ack sessions) on a 5 GHz VHT80 link; co
 
 **AX200, 5 GHz VHT80 (ch 149), build 3109864:** without `AX200BA` 4.6 MB/s, the firmware died at 44% (UMAC 0x5D); with `AX200BA = 1` 6.55 MB/s (RX BA sessions=3, direct 6830, reordered 1424, refused 0), died at 14%.
 The late 0x5D crash gets earlier the higher the throughput: suspect the RX FIFO watchdog (64 receive buffers, service stalls up to 80 ms); the default is now 256 buffers (`MQBUFS`).
+
+**AX200 on a DFS channel (136, VHT80, centre 138): the firmware dies within seconds** (LMAC 0xEDC after 5 ping replies with `MQBUFS=64`, after 27/60 acknowledged frames in two download attempts, with and without `AX200BA`).
+Channels 11 and 149 (not DFS) ran for hundreds of MB. Not understood; Linux joins DFS channels. Suspect something regulatory (MCC / channel flags) or the PHY context for radar channels. Avoid channels 100-144 with the AX200 for now.
