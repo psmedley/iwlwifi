@@ -864,6 +864,11 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
       hdr[23] = (UCHAR)(sn >> 4);
    }
    pad = (USHORT)((4 - (hlen & 3)) & 3);
+   if (g_cfg->family == IWL_FAM_22000 && qos && !g_ax_qos) {   /* plain data frames: the firmware cannot make an A-MPDU of them (it did, without a BA agreement, and then died) */
+      hdr[0] = (UCHAR)(hdr[0] & 0x7F);              /* QoS data (subtype 8) -> data (subtype 0): the header loses its QoS control field */
+      hlen = 24;
+      pad = 0;
+   }
    if (g_cfg->family == IWL_FAM_22000) {           /* gen2 TX_CMD (v7): cmd header 4, len 2, offload 2, flags 4, dram info 8, rate 4, then the 802.11 header */
       ULONG rate = g_mgmt_rate;
 
