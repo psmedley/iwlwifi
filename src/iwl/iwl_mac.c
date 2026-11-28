@@ -672,6 +672,8 @@ int hw_join_complete(void)
       } else {                                     /* AX200TLC=0: rates from the host ladder in every TX command */
          ladder_build();
          g_rs_cur = g_rs_good = g_rs_bad = g_rs_probe = 0;
+         if (g_lad_delim && g_lad_delim < g_lad_n)
+            g_rs_cur = g_lad_delim;                /* start at the fastest single-stream rate; the adaptation climbs */
          g_rs_block = 0;
          g_rs_hold = 3000UL;
          g_rs_t = dd_ms();
@@ -886,7 +888,10 @@ static int tx_frame_locked(UCHAR FAR *hdr, USHORT hlen, UCHAR FAR *body, USHORT 
          rate = 0UL;                               /* data: the firmware's rate scaling (TLC) chooses        */
       else {
          fl |= 1UL;
-         rate = rs_rate();                         /* AX200TLC=0: the host's ladder                          */
+         if (blen >= 8 && body[6] == 0x88 && body[7] == 0x8E)
+            rate = g_mgmt_rate;                    /* AX200TLC=0: EAPOL at the lowest rate, as the firmware would */
+         else
+            rate = rs_rate();                      /* AX200TLC=0: the host's ladder                          */
       }
       put32(s + 8, fl);
       put32(s + 20, rate);
