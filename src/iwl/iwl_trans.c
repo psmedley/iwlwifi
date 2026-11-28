@@ -1040,7 +1040,7 @@ int iwl22_dataq_create(USHORT sta)
    txq_t *q = &g_txq[QI_BE];
    USHORT qid;
 
-   if (iwl22_txq_alloc((UCHAR)sta, 0, DQ_N, &qid))   /* TID 0: the best-effort FIFO (TID 15 maps to the small management FIFO on this API: a 1.5 KB frame crashed the firmware) */
+   if (iwl22_txq_alloc((UCHAR)sta, 0, 32, &qid))   /* TID 0: the best-effort FIFO (TID 15 maps to the small management FIFO on this API: a 1.5 KB frame crashed the firmware) */
       return -1;
    q->qid = qid;
    q->cur = q->tail = q->queued = 0;

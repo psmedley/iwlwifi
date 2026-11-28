@@ -172,7 +172,7 @@ void iwl22_post(USHORT idx, ULONG phys, USHORT len)
 USHORT g_q22_last, g_q22_wptr, g_q22_fail;
 ULONG  g_q22_ring, g_q22_bc;
 static DMA g_dring, g_dbc;                      /* the data queue's descriptor ring (32 TFDs) and byte-count table */
-USHORT g_dq_n = 128;
+USHORT g_dq_n = 32;                             /* the ring size: 32 works; 128 made the firmware crash at the first wrap (entry 127 -> 0), see docs/TESTING.md */
 static USHORT g_dq_ok, g_dq_qid;
 
 int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)

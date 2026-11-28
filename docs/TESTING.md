@@ -397,3 +397,7 @@ The start-up scan-variant harness (`SCANTRY`) is still in the build; it can be r
 **AX200 data path (first build, untested):** one data queue created by `SCD_QUEUE_CFG` after `ADD_STA` (station id 0, TID 15, 32 TFH descriptors, queue number from the firmware's answer, doorbell `qid<<16 | wptr`),
 TX_CMD v7 (gen2 layout, hardware adds the CCMP header, `ENCRYPT_DIS` for unprotected frames, rate in every command from the host's rate ladder because there is no LQ_CMD),
 TX response status at byte 40, `ADD_STA` without a queue mask, `BINDING_CONTEXT_CMD` always 28 bytes. Aggregation, TLC offload and power save are not wired for this family yet.
+
+**AX200, ring size lesson:** a 128-entry data ring made the firmware assert at the first wrap (entry 127 -> 0): the `TXLOG` of five consecutive crashes ended `7E 7F 00 01`.
+The 32-entry ring wraps every 32 frames without trouble, so it stays. (`TXLOG`, `RXLOG`, `LASTBA`, `LASTTXR` and `SCANTRY` exist for such investigations.)
+PROTOCOL.INI options for the AX200: `AX200TLC` (firmware rate scaling, default 1), `AX200QOS` (QoS data frames, default 1), `MQBUFS` (receive buffers 64 | 128 | 256, default 64).
