@@ -409,3 +409,6 @@ gen2 TX_CMD v7 with hardware CCMP; TLC_MNG_CONFIG v2 (24 bytes); SOC_CONFIGURATI
 the link is ended by restarting the firmware (the removal commands crash it). Still missing: RX block-ack sessions (declined), TX aggregation, power save, PMF.
 
 AX200 next test: `AX200BA = 1` (RX block-ack sessions) on a 5 GHz VHT80 link; compare with the 3.16 MB/s of the 2.4 GHz HT20 run.
+
+**AX200, 5 GHz VHT80 (ch 149), build 3109864:** without `AX200BA` 4.6 MB/s, the firmware died at 44% (UMAC 0x5D); with `AX200BA = 1` 6.55 MB/s (RX BA sessions=3, direct 6830, reordered 1424, refused 0), died at 14%.
+The late 0x5D crash gets earlier the higher the throughput: suspect the RX FIFO watchdog (64 receive buffers, service stalls up to 80 ms); the default is now 256 buffers (`MQBUFS`).

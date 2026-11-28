@@ -185,7 +185,7 @@ typedef struct {
 
 static txq_t  g_txq[NTXQ];
 static DMA    g_kw, g_sched, g_rbd, g_rbstat, g_bigcmd, g_respbuf, g_fwdma;
-USHORT g_cfg_mqbufs = 64;                       /* PROTOCOL.INI MQBUFS = 64 | 128 | 256                                           */
+USHORT g_cfg_mqbufs = 256;                      /* PROTOCOL.INI MQBUFS = 64 | 128 | 256                                           */
 USHORT g_mq_nbuf = RX_NBUF;                     /* receive buffers posted on the multi-queue families (what the memory allowed) */
 static ULONG  g_rxblk[MQ_NBUF / 16];            /* blocks of 64 KB, 16 buffers each (4 used on the older families, 16 on the multi-queue ones) */
 static USHORT g_rxcur;
