@@ -172,6 +172,7 @@ void iwl22_post(USHORT idx, ULONG phys, USHORT len)
 USHORT g_q22_last, g_q22_wptr, g_q22_fail;
 ULONG  g_q22_ring, g_q22_bc;
 static DMA g_dring, g_dbc;                      /* the data queue's descriptor ring (32 TFDs) and byte-count table */
+USHORT g_dq_n = 128;
 static USHORT g_dq_ok, g_dq_qid;
 
 int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
@@ -180,12 +181,21 @@ int iwl22_txq_alloc(UCHAR sta_id, UCHAR tid, USHORT size, USHORT FAR *qid)
    int    rc;
 
    if (!g_dq_ok) {
-      if (dma_get_al((USHORT)(size * TFH_SIZE), 256, &g_dring) || dma_get_al(640, 64, &g_dbc)) {
+      while (dma_get_al((USHORT)(size * TFH_SIZE), 256, &g_dring)) {      /* the ring: 128, else 64, else 32 entries */
+         if (size <= 32) {
+            g_q22_fail = 1;
+            return -1;
+         }
+         size = (USHORT)(size >> 1);
+      }
+      if (dma_get_al(640, 64, &g_dbc)) {
          g_q22_fail = 1;
          return -1;
       }
+      g_dq_n = size;
       g_dq_ok = 1;
    }
+   size = g_dq_n;
    fmemset(DPTR(g_dring), 0, (USHORT)(size * TFH_SIZE));     /* physical memory is not cleared */
    fmemset(DPTR(g_dbc), 0, 640);
    g_q22_ring = g_dring.phys;
@@ -224,7 +234,7 @@ void iwl22_txq_free(UCHAR sta_id, UCHAR tid)
  * and the 802.11 header, the payload at ph + 256), and its entry in the byte-count table (frame length in dwords). */
 void iwl22_data_tfd(USHORT idx, ULONG ph, USHORT cmdlen, USHORT paylen, USHORT totlen)
 {
-   UCHAR FAR *t = DPTR(g_dring) + (idx & 31) * TFH_SIZE;
+   UCHAR FAR *t = DPTR(g_dring) + (idx & (DQ_N - 1)) * TFH_SIZE;
 
    fmemset(t, 0, TFH_SIZE);
    put16(t + 2, 20);
@@ -237,12 +247,12 @@ void iwl22_data_tfd(USHORT idx, ULONG ph, USHORT cmdlen, USHORT paylen, USHORT t
       put16(t, 3);
    } else
       put16(t, 2);
-   put16(DPTR(g_dbc) + (idx & 31) * 2, (USHORT)((totlen + 3) >> 2));
+   put16(DPTR(g_dbc) + (idx & (DQ_N - 1)) * 2, (USHORT)((totlen + 3) >> 2));
 }
 
 void iwl22_status(void (*ps)(const char *), void (*ph)(ULONG v, USHORT digits), void (*nl)(void))
 {
    ps("CTXINFO lmac="); ph(g_ctx_lm, 2); ps(" umac="); ph(g_ctx_um, 2); ps(" paging="); ph(g_ctx_pg, 2);
    ps(" dram="); ph(g_ctx_bytes, 8); ps(" fail="); ph(g_ctx_fail, 4); nl();
-   ps("TXQ22 last="); ph(g_q22_last, 2); ps(" wptr="); ph(g_q22_wptr, 4); ps(" ring="); ph(g_q22_ring, 8); ps(" fail="); ph(g_q22_fail, 2); nl();
+   ps("TXQ22 last="); ph(g_q22_last, 2); ps(" wptr="); ph(g_q22_wptr, 4); ps(" ring="); ph(g_q22_ring, 8); ps(" entries="); ph(g_dq_n, 3); ps(" fail="); ph(g_q22_fail, 2); nl();
 }

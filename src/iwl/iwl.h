@@ -244,6 +244,8 @@ extern char *g_devname;
 #define TID_NON_QOS             0
 #define FRAME_LIMIT             64
 
+#define DQ_N                    g_dq_n          /* AX200: entries of the data queue's ring (128, 64 or 32 as memory allows; the 32 buffers are reused: TX_SLOTS divides it) */
+extern USHORT g_dq_n;
 #define TX_SLOTS                32              /* data frames in flight (a divisor of the 256-entry ring)   */
 #define TX_SLOT_SZ              1792U           /* command (<= 256 bytes) + CCMP header + 1514-byte frame      */
 #define QI_BE                   2               /* index in the driver's queue table: the BE data queue    */

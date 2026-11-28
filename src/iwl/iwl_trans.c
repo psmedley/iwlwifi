@@ -1040,7 +1040,7 @@ int iwl22_dataq_create(USHORT sta)
    txq_t *q = &g_txq[QI_BE];
    USHORT qid;
 
-   if (iwl22_txq_alloc((UCHAR)sta, 0, 32, &qid))   /* TID 0: the best-effort FIFO (TID 15 maps to the small management FIFO on this API: a 1.5 KB frame crashed the firmware) */
+   if (iwl22_txq_alloc((UCHAR)sta, 0, DQ_N, &qid))   /* TID 0: the best-effort FIFO (TID 15 maps to the small management FIFO on this API: a 1.5 KB frame crashed the firmware) */
       return -1;
    q->qid = qid;
    q->cur = q->tail = q->queued = 0;
@@ -1322,7 +1322,7 @@ UCHAR FAR *iwl_txq_slot(USHORT qi, USHORT *idx, ULONG *phys)
       while (q->queued && q->busy[q->tail & (TX_SLOTS - 1)] && (USHORT)(now - q->stamp[q->tail & (TX_SLOTS - 1)]) > 250) {
          q->busy[q->tail & (TX_SLOTS - 1)] = 0;
          q->queued--;
-         q->tail = (USHORT)((q->tail + 1) & 31);
+         q->tail = (USHORT)((q->tail + 1) & (DQ_N - 1));
       }
    }
    if (!g_trans_on || !q->ok || !q->nslot || q->qid == 0xFFFF || q->queued >= TX_SLOTS - 1)
@@ -1351,7 +1351,7 @@ int iwl_txq_kick(USHORT qi, USHORT idx, USHORT cmdlen, USHORT paylen, USHORT tot
       q->busy[s] = 1;
       q->stamp[s] = (USHORT)dd_ms();
       q->queued++;
-      q->cur = (USHORT)((q->cur + 1) & 31);
+      q->cur = (USHORT)((q->cur + 1) & (DQ_N - 1));
       iwl_wr(HBUS_TARG_WRPTR, (ULONG)q->cur | ((ULONG)q->qid << 16));
       return 0;
    }
@@ -1390,7 +1390,7 @@ void iwl_txq_reset(USHORT qi, USHORT idx)
 void iwl_txq_reclaim_to(USHORT qi, USHORT idx)
 {
    txq_t *q = &g_txq[qi];
-   USHORT msk = (USHORT)(g_cfg->family == IWL_FAM_22000 ? 31 : (TFD_QUEUE_SIZE_MAX - 1));   /* the gen2 ring has 32 entries */
+   USHORT msk = (USHORT)(g_cfg->family == IWL_FAM_22000 ? (DQ_N - 1) : (TFD_QUEUE_SIZE_MAX - 1));
    USHORT n = (USHORT)((idx - q->tail) & msk);
 
    if (n > q->queued)

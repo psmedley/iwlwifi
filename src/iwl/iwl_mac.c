@@ -995,7 +995,7 @@ void iwl_tx_done(UCHAR qid, UCHAR idx, UCHAR FAR *p, USHORT len)
          USHORT fl = rt_irq_save();
 
          if (!rt_lock_acquire(&g_hwtxlk, (USHORT)(rt_cpu_id() + 1))) {
-            iwl_txq_reclaim_to(QI_BE, (USHORT)(get32(p + stoff + 4) & 31));
+            iwl_txq_reclaim_to(QI_BE, (USHORT)(get32(p + stoff + 4) & (DQ_N - 1)));
             rt_lock_release(&g_hwtxlk);
          }
          rt_irq_restore(fl);
